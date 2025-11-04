@@ -1,0 +1,118 @@
+name: Release
+permissions:
+  contents: read
+
+on:
+  push:
+    tags:
+      - v*
+
+concurrency:
+  group: release
+  cancel-in-progress: true
+
+env:
+  RUBY_VERSION: 3.4.3
+  APP_DIR: ${{ github.workspace }}/rails_cron
+
+jobs:
+  setup:
+    name: Setup
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ env.APP_DIR }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ env.RUBY_VERSION }}
+          bundler-cache: true
+          working-directory: ${{ env.APP_DIR }}
+      - run: bundle info rake
+
+  lint:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    needs: setup
+    defaults:
+      run:
+        working-directory: ${{ env.APP_DIR }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ env.RUBY_VERSION }}
+          bundler-cache: true
+          working-directory: ${{ env.APP_DIR }}
+      - name: RuboCop
+        run: bin/rubocop -f github
+
+  reek:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    needs: setup
+    defaults:
+      run:
+        working-directory: ${{ env.APP_DIR }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ env.RUBY_VERSION }}
+          bundler-cache: true
+          working-directory: ${{ env.APP_DIR }}
+      - name: Reek
+        run: bin/reek
+
+  tests:
+    name: Tests (${{ matrix.name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        gemfile:
+          - rails_8_0.gemfile
+          - rails_7_2.gemfile
+          - rails_edge.gemfile
+        include:
+          - gemfile: rails_8_0.gemfile
+            name: Rails 8.0
+          - gemfile: rails_7_2.gemfile
+            name: Rails 7.2
+          - gemfile: rails_edge.gemfile
+            name: Rails Edge
+
+    needs: [lint, reek]
+    uses: ./.github/workflows/ruby-unit-tests.yml
+    with:
+      rspec_task: bin/rspec-unit --profile 10
+      upload_coverage: ${{ matrix.gemfile == 'rails_8_0.gemfile' }}
+      bundle_gemfile: rails_cron/gemfiles/${{ matrix.gemfile }}
+    secrets:
+      QLTY_COVERAGE_TOKEN: ${{ secrets.QLTY_COVERAGE_TOKEN }}
+  push:
+    name: Build & Push gem
+    runs-on: ubuntu-latest
+    needs: [tests]
+    permissions:
+      contents: write
+      id-token: write
+    environment: release
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ env.RUBY_VERSION }}
+          bundler-cache: true
+          working-directory: ${{ env.APP_DIR }}
+      - name: Configure RubyGems Credentials
+        uses: rubygems/configure-rubygems-credentials@main
+      - name: Release
+        run: |
+          cd rails_cron
+          gem build rails_cron.gemspec
+          gem push rails_cron-*.gem
