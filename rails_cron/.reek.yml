@@ -1,0 +1,31 @@
+---
+detectors:
+  UncommunicativeVariableName:
+    accept:
+      - e
+      - t
+      - _
+  TooManyStatements:
+    enabled: true
+    max_statements: 20
+  BooleanParameter:
+    enabled: false
+  ControlParameter:
+    enabled: false
+  TooManyConstants:
+    enabled: true
+    max_constants: 30
+  LongParameterList:
+    enabled: true
+    max_params: 10
+  TooManyInstanceVariables:
+    enabled: true
+    max_instance_variables: 10
+  DataClump:
+    enabled: false
+exclude_paths:
+  - spec/**/*
+  - db/**/*
+  - bin/*
+  - config/**/*
+  - vendor/**/*

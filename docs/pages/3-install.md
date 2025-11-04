@@ -25,7 +25,7 @@ Then run:
 # Install the gem
 bundle install
 
-# (Optional) Generate the initializer
+# Generate the initializer
 bin/rails g rails_cron:install
 ```
 
@@ -35,7 +35,7 @@ bin/rails g rails_cron:install
 
 If you ran the generator, you’ll find the file at:
 
-```
+```bash
 config/initializers/rails_cron.rb
 ```
 

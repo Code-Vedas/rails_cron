@@ -6,6 +6,8 @@ nav_order: 1
 
 # Rails Cron (rails_cron)
 
+> First release 0.0.1 is empty gem.
+
 [![Gem](https://img.shields.io/gem/v/rails_cron.svg?style=flat-square)](https://rubygems.org/gems/rails_cron)
 [![CI](https://github.com/Code-Vedas/rails_cron/actions/workflows/ci.yml/badge.svg)](https://github.com/Code-Vedas/rails_cron/actions/workflows/ci.yml)
 [![Maintainability](https://qlty.sh/gh/Code-Vedas/projects/rails_cron/maintainability.svg)](https://qlty.sh/gh/Code-Vedas/projects/rails_cron)
@@ -21,6 +23,7 @@ nav_order: 1
 ---
 
 ## Install the gem
+
 ```ruby
 # Gemfile
 gem 'rails_cron'
@@ -43,21 +46,21 @@ bin/rails g rails_cron:install
 
 ## Features
 
-* **Scheduler-agnostic**: Works with any job system (`ActiveJob`, `Sidekiq`, `Resque`, etc.)
-* **Multi-node safe**: Ensures single-dispatch execution across all app instances
-* **Lock adapters**: Redis (`SET NX PX`) and Postgres (`pg_try_advisory_lock`), plus in-memory fallback
-* **Registry & API**: Centralized job registration with deterministic idempotency keys
-* **Dispatch recovery**: Replays missed runs within a configurable lookback window
-* **Cron utilities**: Validate, lint, simplify (`@daily`), humanize, and translate via i18n
-* **i18n keys**: Fully localizable weekdays, months, and time phrases (`rails_cron.*`)
-* **CLI tools**: `rails-crons explain`, `next`, `run`, and Rails Rake tasks (`rails_cron:start`, `status`, etc.)
-* **Standalone mode**: Launch scheduler via Procfile, systemd, or Kubernetes
-* **Rails integration**: Railtie auto-loads configuration and Rake tasks
-* **Observability**: Optional status inspection via `rails_cron:status`
-* **Graceful shutdown**: Handles `TERM`/`INT` signals and finishes current tick cleanly
-* **Testing**: Thread-safe, multi-node safety specs included
-* **Development & CI**: Bundler, RSpec, RuboCop, GitHub Actions workflows
-* **Documentation**: README, feature templates, and roadmap included
+- **Scheduler-agnostic**: Works with any job system (`ActiveJob`, `Sidekiq`, `Resque`, etc.)
+- **Multi-node safe**: Ensures single-dispatch execution across all app instances
+- **Lock adapters**: Redis (`SET NX PX`) and Postgres (`pg_try_advisory_lock`), plus in-memory fallback
+- **Registry & API**: Centralized job registration with deterministic idempotency keys
+- **Dispatch recovery**: Replays missed runs within a configurable lookback window
+- **Cron utilities**: Validate, lint, simplify (`@daily`), humanize, and translate via i18n
+- **i18n keys**: Fully localizable weekdays, months, and time phrases (`rails_cron.*`)
+- **CLI tools**: `rails-crons explain`, `next`, `run`, and Rails Rake tasks (`rails_cron:start`, `status`, etc.)
+- **Standalone mode**: Launch scheduler via Procfile, systemd, or Kubernetes
+- **Rails integration**: Railtie auto-loads configuration and Rake tasks
+- **Observability**: Optional status inspection via `rails_cron:status`
+- **Graceful shutdown**: Handles `TERM`/`INT` signals and finishes current tick cleanly
+- **Testing**: Thread-safe, multi-node safety specs included
+- **Development & CI**: Bundler, RSpec, RuboCop, GitHub Actions workflows
+- **Documentation**: README, feature templates, and roadmap included
 
 ---
 
