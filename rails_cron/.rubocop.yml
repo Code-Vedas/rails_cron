@@ -1,0 +1,15 @@
+plugins:
+  - rubocop-rspec
+  - rubocop-rspec_rails
+  - rubocop-performance
+  - rubocop-rake
+  - rubocop-factory_bot
+
+AllCops:
+  NewCops: enable
+  TargetRubyVersion: 3.2
+  SuggestExtensions: true
+  Exclude:
+    - .vscode/**/*
+    - vendor/**/* # ignore vendored gems
+    - vendor/bundle/**/* # (explicitly, for Bundler’s path)

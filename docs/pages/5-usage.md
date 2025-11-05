@@ -101,7 +101,7 @@ Displays the current configuration, lock adapter, and registered jobs.
 
 Example output:
 
-```
+```bash
 RailsCron v1.0.0
 Lock adapter: Redis
 Tick interval: 5s
@@ -114,7 +114,7 @@ Next tick: 2025-11-10 09:00:00 UTC
 
 ## 🧠 Tips
 
-* Use `Rails.logger.info` inside your job block for observability.
-* Use `window_lookback` to replay missed ticks (e.g., after downtime).
-* Never duplicate the same `key` — it uniquely identifies each job.
-* The scheduler gracefully stops on `TERM` or `INT`, finishing the current tick first.
+- Use `Rails.logger.info` inside your job block for observability.
+- Use `window_lookback` to replay missed ticks (e.g., after downtime).
+- Never duplicate the same `key` — it uniquely identifies each job.
+- The scheduler gracefully stops on `TERM` or `INT`, finishing the current tick first.

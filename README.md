@@ -1,5 +1,6 @@
 # ⏰ RailsCron — Distributed Cron Scheduler for Rails
 
+> First release 0.0.1 is empty gem.
 > A scheduler-agnostic, multi-node-safe cron runner for Ruby and Rails.  
 > Designed and maintained by **Codevedas Inc.**
 
@@ -18,14 +19,13 @@
 
 This repository contains the **RailsCron** gem and its documentation site.
 
-```
+```text
 
 /repo-root
 ├── .github/              # CI workflows, issue templates
 ├── rails_cron/           # Gem source (lib/, bin/, gemspec)
 ├── docs/                 # Documentation site (Jekyll + Markdown)
 └── README.md             # This file
-
 ```
 
 ---
@@ -46,12 +46,12 @@ Comprehensive guides are published at:
 
 👉 **[https://rails-cron.codevedas.com](https://rails-cron.codevedas.com)**
 
-| Section | Description |
-|----------|-------------|
-| [Overview & Motivation](https://rails-cron.codevedas.com/overview) | Why RailsCron exists |
-| [Installation & Setup](https://rails-cron.codevedas.com/install) | Gem setup and initializer |
-| [Usage](https://rails-cron.codevedas.com/usage) | Registering jobs, CLI, and Rake tasks |
-| [FAQ / Troubleshooting](https://rails-cron.codevedas.com/faq) | Common issues and fixes |
+| Section                                                            | Description                           |
+| ------------------------------------------------------------------ | ------------------------------------- |
+| [Overview & Motivation](https://rails-cron.codevedas.com/overview) | Why RailsCron exists                  |
+| [Installation & Setup](https://rails-cron.codevedas.com/install)   | Gem setup and initializer             |
+| [Usage](https://rails-cron.codevedas.com/usage)                    | Registering jobs, CLI, and Rake tasks |
+| [FAQ / Troubleshooting](https://rails-cron.codevedas.com/faq)      | Common issues and fixes               |
 
 ---
 
@@ -76,6 +76,7 @@ bin/rspec-unit
 ```bash
 bin/rubocop
 ```
+
 ### 4. Reek
 
 ```bash
@@ -122,11 +123,11 @@ Then open:
 
 GitHub Actions workflows include:
 
-| Workflow      | Purpose                                           |
-| ------------- | ------------------------------------------------- |
-| `ci.yml`      | Runs tests (RSpec + RuboCop) on all Ruby versions |
-| `release.yml` | Builds and publishes gem to RubyGems              |
-| `jekyll-gh-pages.yml`   | Builds and deploys docs to GitHub Pages           |
+| Workflow              | Purpose                                           |
+| --------------------- | ------------------------------------------------- |
+| `ci.yml`              | Runs tests (RSpec + RuboCop) on all Ruby versions |
+| `release.yml`         | Builds and publishes gem to RubyGems              |
+| `jekyll-gh-pages.yml` | Builds and deploys docs to GitHub Pages           |
 
 ---
 

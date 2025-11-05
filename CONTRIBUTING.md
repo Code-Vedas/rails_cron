@@ -22,9 +22,9 @@ This project comprises various modules/components, each housed in its dedicated 
 
 The table below provides an overview of all possible modules/components:
 
-| Module/Component | Description                           | Related Language/Framework |
-| ---------------- | ------------------------------------- | -------------------------- |
-| rails_cron      | Rails crons library                   | Ruby on Rails              |
+| Module/Component | Description         | Related Language/Framework |
+| ---------------- | ------------------- | -------------------------- |
+| rails_cron       | Rails crons library | Ruby on Rails              |
 
 ## Improve Documentation
 
@@ -158,8 +158,8 @@ Pick the version number from draft release notes on the
 8. **Open a PR to `main`**
    Create a pull request to merge `release/<version>` into `main`.
 
-9.  **Label the PR**
-    Tag the PR with `release`, `release/<version>`, and `skip-changelog`.
+9. **Label the PR**
+   Tag the PR with `release`, `release/<version>`, and `skip-changelog`.
 
 10. **Create a GitHub Release**
     After the PR is approved and merged, create a new Release on the
