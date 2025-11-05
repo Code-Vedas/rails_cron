@@ -1,6 +1,6 @@
 # ⏰ RailsCron — Distributed Cron Scheduler for Rails
 
-> First release 0.0.1 is empty gem.
+> First release 0.1.0 is empty gem.
 > A scheduler-agnostic, multi-node-safe cron runner for Ruby and Rails.  
 > Designed and maintained by **Codevedas Inc.**
 
@@ -11,7 +11,6 @@
 ![License](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-12%2B-336791?style=flat-square&logo=postgresql&logoColor=white)
 ![Redis](https://img.shields.io/badge/Redis-6%2B-d92b2b?style=flat-square&logo=redis&logoColor=white)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ---
 

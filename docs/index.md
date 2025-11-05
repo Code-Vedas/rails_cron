@@ -6,7 +6,7 @@ nav_order: 1
 
 # Rails Cron (rails_cron)
 
-> First release 0.0.1 is empty gem.
+> First release 0.1.0 is empty gem.
 
 [![Gem](https://img.shields.io/gem/v/rails_cron.svg?style=flat-square)](https://rubygems.org/gems/rails_cron)
 [![CI](https://github.com/Code-Vedas/rails_cron/actions/workflows/ci.yml/badge.svg)](https://github.com/Code-Vedas/rails_cron/actions/workflows/ci.yml)

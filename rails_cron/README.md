@@ -1,6 +1,6 @@
 # ⏰ RailsCron
 
-> First release 0.0.1 is empty gem.
+> First release 0.1.0 is empty gem.
 > 🕒 A scheduler-agnostic, multi-node-safe cron runner for Ruby and Rails — with Redis or Postgres advisory locks.
 
 [![Gem](https://img.shields.io/gem/v/rails_cron.svg?style=flat-square)](https://rubygems.org/gems/rails_cron)
@@ -10,7 +10,6 @@
 ![License](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-12%2B-336791?style=flat-square&logo=postgresql&logoColor=white)
 ![Redis](https://img.shields.io/badge/Redis-6%2B-d92b2b?style=flat-square&logo=redis&logoColor=white)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ---
 
