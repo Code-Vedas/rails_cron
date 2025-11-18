@@ -7,7 +7,7 @@ gemspec
 
 group :development, :test do
   gem 'danger'
-  gem 'i18n-tasks', '~> 1.0'
+  gem 'i18n-tasks', '~> 1.1'
   gem 'reek'
   gem 'rspec-rails'
   gem 'rubocop-factory_bot'
