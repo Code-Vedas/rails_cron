@@ -94,7 +94,7 @@ module RailsCron
     #     enqueue: ->(fire_time:, idempotency_key:) { WeeklySummaryJob.perform_later }
     #   )
     def register(key:, cron:, enqueue:)
-      registry.add(key, cron, enqueue)
+      registry.add(key: key, cron: cron, enqueue: enqueue)
     end
 
     ##

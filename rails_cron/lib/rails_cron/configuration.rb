@@ -68,7 +68,7 @@ module RailsCron
     # Raises errors if required settings are invalid.
     #
     # @raise [ConfigurationError] if validation fails
-    # @return [true] if validation passes
+    # @return [Configuration] self if validation passes
     def validate!
       errors = validation_errors
       raise ConfigurationError, errors.join('; ') if errors.any?

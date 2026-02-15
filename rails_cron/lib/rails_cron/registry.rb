@@ -12,10 +12,10 @@ module RailsCron
   #
   # @example Register a job
   #   registry = RailsCron::Registry.new
-  #   registry.add("reports:daily", "0 9 * * *", ->(fire_time:, idempotency_key:) { })
+  #   registry.add(key: "reports:daily", cron: "0 9 * * *", enqueue: ->(fire_time:, idempotency_key:) { })
   #
   # @example Retrieve all jobs
-  #   registry.all # => [{ key: "reports:daily", cron: "0 9 * * *", enqueue: Proc }]
+  #   registry.all # => [#<RailsCron::Registry::Entry key="reports:daily", cron="0 9 * * *", enqueue=#<Proc ...>>]
   class Registry
     include Enumerable
 
@@ -50,7 +50,7 @@ module RailsCron
     #     cron: "0 9 * * *",
     #     enqueue: ->(fire_time:, idempotency_key:) { MyJob.perform_later }
     #   )
-    def add(key, cron, enqueue)
+    def add(key:, cron:, enqueue:)
       validate_entry(key, cron, enqueue)
 
       @mutex.synchronize do

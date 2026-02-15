@@ -43,53 +43,53 @@ RSpec.describe RailsCron::Registry do
 
   describe '#add' do
     it 'returns entry with attributes' do
-      entry = registry.add(test_key, test_cron, test_enqueue)
+      entry = registry.add(key: test_key, cron: test_cron, enqueue: test_enqueue)
       expect(entry).to have_attributes(key: test_key, cron: test_cron, enqueue: test_enqueue)
     end
 
     it 'increases size' do
-      expect { registry.add(test_key, test_cron, test_enqueue) }.to change(registry, :size).from(0).to(1)
+      expect { registry.add(key: test_key, cron: test_cron, enqueue: test_enqueue) }.to change(registry, :size).from(0).to(1)
     end
 
     it 'returns a Registry::Entry' do
-      entry = registry.add(test_key, test_cron, test_enqueue)
+      entry = registry.add(key: test_key, cron: test_cron, enqueue: test_enqueue)
       expect(entry).to be_a(described_class::Entry)
     end
 
     it 'raises when key is empty' do
-      expect { registry.add('', test_cron, test_enqueue) }.to raise_error(ArgumentError, /key cannot be empty/)
+      expect { registry.add(key: '', cron: test_cron, enqueue: test_enqueue) }.to raise_error(ArgumentError, /key cannot be empty/)
     end
 
     it 'raises when key is whitespace' do
-      expect { registry.add('   ', test_cron, test_enqueue) }.to raise_error(ArgumentError, /key cannot be empty/)
+      expect { registry.add(key: '   ', cron: test_cron, enqueue: test_enqueue) }.to raise_error(ArgumentError, /key cannot be empty/)
     end
 
     it 'raises when cron is empty' do
-      expect { registry.add(test_key, '', test_enqueue) }.to raise_error(ArgumentError, /cron cannot be empty/)
+      expect { registry.add(key: test_key, cron: '', enqueue: test_enqueue) }.to raise_error(ArgumentError, /cron cannot be empty/)
     end
 
     it 'raises when cron is whitespace' do
-      expect { registry.add(test_key, '   ', test_enqueue) }.to raise_error(ArgumentError, /cron cannot be empty/)
+      expect { registry.add(key: test_key, cron: '   ', enqueue: test_enqueue) }.to raise_error(ArgumentError, /cron cannot be empty/)
     end
 
     it 'raises when enqueue is not callable' do
-      expect { registry.add(test_key, test_cron, 'not callable') }.to raise_error(ArgumentError, /enqueue must be callable/)
+      expect { registry.add(key: test_key, cron: test_cron, enqueue: 'not callable') }.to raise_error(ArgumentError, /enqueue must be callable/)
     end
 
     it 'raises when key is already registered' do
-      registry.add(test_key, test_cron, test_enqueue)
-      expect { registry.add(test_key, '0 10 * * *', test_enqueue) }.to raise_error(RailsCron::RegistryError, /already registered/)
+      registry.add(key: test_key, cron: test_cron, enqueue: test_enqueue)
+      expect { registry.add(key: test_key, cron: '0 10 * * *', enqueue: test_enqueue) }.to raise_error(RailsCron::RegistryError, /already registered/)
     end
 
     it 'accepts Proc for enqueue' do
       proc = proc { |fire_time:, idempotency_key:| }
-      entry = registry.add(test_key, test_cron, proc)
+      entry = registry.add(key: test_key, cron: test_cron, enqueue: proc)
       expect(entry.enqueue).to eq(proc)
     end
 
     it 'accepts Method objects for enqueue' do
       method_ref = method(:puts)
-      entry = registry.add(test_key, test_cron, method_ref)
+      entry = registry.add(key: test_key, cron: test_cron, enqueue: method_ref)
       expect(entry.enqueue).to eq(method_ref)
     end
 
@@ -98,32 +98,32 @@ RSpec.describe RailsCron::Registry do
         def call(*); end
       end.new
 
-      entry = registry.add(test_key, test_cron, callable)
+      entry = registry.add(key: test_key, cron: test_cron, enqueue: callable)
       expect(entry.enqueue).to eq(callable)
     end
 
     it 'returns a frozen entry to prevent external mutation' do
-      entry = registry.add(test_key, test_cron, test_enqueue)
+      entry = registry.add(key: test_key, cron: test_cron, enqueue: test_enqueue)
       expect(entry).to be_frozen
     end
 
     it 'prevents mutation of entry key' do
-      entry = registry.add(test_key, test_cron, test_enqueue)
+      entry = registry.add(key: test_key, cron: test_cron, enqueue: test_enqueue)
       expect { entry.key = 'new_key' }.to raise_error(FrozenError)
     end
 
     it 'prevents mutation of entry cron' do
-      entry = registry.add(test_key, test_cron, test_enqueue)
+      entry = registry.add(key: test_key, cron: test_cron, enqueue: test_enqueue)
       expect { entry.cron = '0 10 * * *' }.to raise_error(FrozenError)
     end
 
     it 'prevents mutation of entry enqueue' do
-      entry = registry.add(test_key, test_cron, test_enqueue)
+      entry = registry.add(key: test_key, cron: test_cron, enqueue: test_enqueue)
       expect { entry.enqueue = proc {} }.to raise_error(FrozenError)
     end
 
     it 'protects internal mapping from corruption via find result' do
-      registry.add('original_key', test_cron, test_enqueue)
+      registry.add(key: 'original_key', cron: test_cron, enqueue: test_enqueue)
       found_entry = registry.find('original_key')
 
       # Attempt to mutate should raise FrozenError
@@ -136,7 +136,7 @@ RSpec.describe RailsCron::Registry do
   end
 
   describe '#remove' do
-    before { registry.add(test_key, test_cron, test_enqueue) }
+    before { registry.add(key: test_key, cron: test_cron, enqueue: test_enqueue) }
 
     it 'removes an entry from the registry' do
       expect { registry.remove(test_key) }.to change(registry, :size).from(1).to(0)
@@ -162,7 +162,7 @@ RSpec.describe RailsCron::Registry do
   end
 
   describe '#find' do
-    before { registry.add(test_key, test_cron, test_enqueue) }
+    before { registry.add(key: test_key, cron: test_cron, enqueue: test_enqueue) }
 
     it 'returns the entry' do
       entry = registry.find(test_key)
@@ -189,18 +189,18 @@ RSpec.describe RailsCron::Registry do
     end
 
     it 'returns all entries as an array' do
-      registry.add('job1', '0 9 * * *', test_enqueue)
-      registry.add('job2', '0 10 * * *', test_enqueue)
+      registry.add(key: 'job1', cron: '0 9 * * *', enqueue: test_enqueue)
+      registry.add(key: 'job2', cron: '0 10 * * *', enqueue: test_enqueue)
       expect(registry.all.map(&:key)).to contain_exactly('job1', 'job2')
     end
 
     it 'returns a copy of the entries' do
-      registry.add(test_key, test_cron, test_enqueue)
+      registry.add(key: test_key, cron: test_cron, enqueue: test_enqueue)
       expect(registry.all).not_to be(registry.all)
     end
 
     it 'returns frozen entries' do
-      registry.add(test_key, test_cron, test_enqueue)
+      registry.add(key: test_key, cron: test_cron, enqueue: test_enqueue)
       expect(registry.all.first).to be_frozen
     end
   end
@@ -211,20 +211,20 @@ RSpec.describe RailsCron::Registry do
     end
 
     it 'returns the count of registered entries' do
-      registry.add('job1', '0 9 * * *', test_enqueue)
-      registry.add('job2', '0 10 * * *', test_enqueue)
+      registry.add(key: 'job1', cron: '0 9 * * *', enqueue: test_enqueue)
+      registry.add(key: 'job2', cron: '0 10 * * *', enqueue: test_enqueue)
       expect(registry.size).to eq(2)
     end
 
     it 'decreases when entries are removed' do
-      registry.add(test_key, test_cron, test_enqueue)
+      registry.add(key: test_key, cron: test_cron, enqueue: test_enqueue)
       expect { registry.remove(test_key) }.to change(registry, :size).from(1).to(0)
     end
   end
 
   describe '#count' do
     it 'matches size' do
-      registry.add('job1', '0 9 * * *', test_enqueue)
+      registry.add(key: 'job1', cron: '0 9 * * *', enqueue: test_enqueue)
       expect(registry.count).to eq(registry.size)
     end
   end
@@ -235,26 +235,26 @@ RSpec.describe RailsCron::Registry do
     end
 
     it 'returns true for registered key' do
-      registry.add(test_key, test_cron, test_enqueue)
+      registry.add(key: test_key, cron: test_cron, enqueue: test_enqueue)
       expect(registry.registered?(test_key)).to be(true)
     end
 
     it 'returns false after entry is removed' do
-      registry.add(test_key, test_cron, test_enqueue)
+      registry.add(key: test_key, cron: test_cron, enqueue: test_enqueue)
       expect { registry.remove(test_key) }.to change { registry.registered?(test_key) }.from(true).to(false)
     end
   end
 
   describe '#clear' do
     it 'removes all entries' do
-      registry.add('job1', '0 9 * * *', test_enqueue)
-      registry.add('job2', '0 10 * * *', test_enqueue)
+      registry.add(key: 'job1', cron: '0 9 * * *', enqueue: test_enqueue)
+      registry.add(key: 'job2', cron: '0 10 * * *', enqueue: test_enqueue)
       expect { registry.clear }.to change(registry, :size).from(2).to(0)
     end
 
     it 'returns the number of cleared entries' do
-      registry.add('job1', '0 9 * * *', test_enqueue)
-      registry.add('job2', '0 10 * * *', test_enqueue)
+      registry.add(key: 'job1', cron: '0 9 * * *', enqueue: test_enqueue)
+      registry.add(key: 'job2', cron: '0 10 * * *', enqueue: test_enqueue)
       expect(registry.clear).to eq(2)
     end
 
@@ -273,27 +273,27 @@ RSpec.describe RailsCron::Registry do
     end
 
     it 'yields each entry' do
-      registry.add('job1', '0 9 * * *', test_enqueue)
-      registry.add('job2', '0 10 * * *', test_enqueue)
+      registry.add(key: 'job1', cron: '0 9 * * *', enqueue: test_enqueue)
+      registry.add(key: 'job2', cron: '0 10 * * *', enqueue: test_enqueue)
       expect(registry.map(&:key)).to contain_exactly('job1', 'job2')
     end
 
     it 'is thread-safe' do
-      registry.add('job1', '0 9 * * *', test_enqueue)
+      registry.add(key: 'job1', cron: '0 9 * * *', enqueue: test_enqueue)
       entries_seen = []
       Thread.new { registry.each { |entry| entries_seen << entry } }.join
       expect(entries_seen.size).to eq(1)
     end
 
     it 'yields frozen entries' do
-      registry.add(test_key, test_cron, test_enqueue)
-      registry.add('job2', '0 10 * * *', test_enqueue)
+      registry.add(key: test_key, cron: test_cron, enqueue: test_enqueue)
+      registry.add(key: 'job2', cron: '0 10 * * *', enqueue: test_enqueue)
       expect(registry.each.to_a).to all(be_frozen)
     end
 
     it 'does not deadlock when block calls back into registry' do
-      registry.add('job1', '0 9 * * *', test_enqueue)
-      registry.add('job2', '0 10 * * *', test_enqueue)
+      registry.add(key: 'job1', cron: '0 9 * * *', enqueue: test_enqueue)
+      registry.add(key: 'job2', cron: '0 10 * * *', enqueue: test_enqueue)
 
       # This should not deadlock
       expect do
@@ -306,9 +306,9 @@ RSpec.describe RailsCron::Registry do
     end
 
     it 'allows removing entries during iteration without affecting the iteration' do
-      registry.add('job1', '0 9 * * *', test_enqueue)
-      registry.add('job2', '0 10 * * *', test_enqueue)
-      registry.add('job3', '0 11 * * *', test_enqueue)
+      registry.add(key: 'job1', cron: '0 9 * * *', enqueue: test_enqueue)
+      registry.add(key: 'job2', cron: '0 10 * * *', enqueue: test_enqueue)
+      registry.add(key: 'job3', cron: '0 11 * * *', enqueue: test_enqueue)
 
       keys_seen = []
       registry.each do |entry|
@@ -329,15 +329,15 @@ RSpec.describe RailsCron::Registry do
     end
 
     it 'returns entries as hashes' do
-      registry.add(test_key, test_cron, test_enqueue)
+      registry.add(key: test_key, cron: test_cron, enqueue: test_enqueue)
       expect(registry.to_a.first).to include(key: test_key, cron: test_cron)
     end
   end
 
   describe '#inspect' do
     it 'returns a string representation' do
-      registry.add('job1', '0 9 * * *', test_enqueue)
-      registry.add('job2', '0 10 * * *', test_enqueue)
+      registry.add(key: 'job1', cron: '0 9 * * *', enqueue: test_enqueue)
+      registry.add(key: 'job2', cron: '0 10 * * *', enqueue: test_enqueue)
       expect(registry.inspect).to include('RailsCron::Registry', 'size=2', 'job1', 'job2')
     end
 
@@ -348,28 +348,28 @@ RSpec.describe RailsCron::Registry do
 
   describe 'thread safety' do
     it 'handles concurrent additions' do
-      run_threads(10) { |i| registry.add("job#{i}", "0 #{i} * * *", test_enqueue) }
+      run_threads(10) { |i| registry.add(key: "job#{i}", cron: "0 #{i} * * *", enqueue: test_enqueue) }
       expect(registry.size).to eq(10)
     end
 
     it 'handles concurrent additions and removals' do
-      10.times { |i| registry.add("job#{i}", '0 9 * * *', test_enqueue) }
+      10.times { |i| registry.add(key: "job#{i}", cron: '0 9 * * *', enqueue: test_enqueue) }
       run_threads(10) do |i|
         registry.remove("job#{i}")
-        registry.add("new_job#{i}", '0 10 * * *', test_enqueue)
+        registry.add(key: "new_job#{i}", cron: '0 10 * * *', enqueue: test_enqueue)
       end
       expect(registry.size).to eq(10)
     end
 
     it 'handles concurrent reads' do
-      registry.add(test_key, test_cron, test_enqueue)
+      registry.add(key: test_key, cron: test_cron, enqueue: test_enqueue)
       results = Queue.new
       run_threads(10) { results << registry.find(test_key) }
       expect(results.size).to eq(10)
     end
 
     it 'prevents duplicate key registration under concurrent load' do
-      errors = collect_errors(10) { registry.add(test_key, test_cron, test_enqueue) }
+      errors = collect_errors(10) { registry.add(key: test_key, cron: test_cron, enqueue: test_enqueue) }
       expect([registry.size, errors.size]).to eq([1, 9])
     end
   end
