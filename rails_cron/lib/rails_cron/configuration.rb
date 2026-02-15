@@ -28,8 +28,6 @@ module RailsCron
       time_zone: nil
     }.freeze
 
-    CONFIG_KEYS = DEFAULTS.keys.freeze
-
     ##
     # Initialize a new Configuration instance with default values.
     #

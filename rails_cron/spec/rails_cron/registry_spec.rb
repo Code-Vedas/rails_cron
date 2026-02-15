@@ -101,6 +101,38 @@ RSpec.describe RailsCron::Registry do
       entry = registry.add(test_key, test_cron, callable)
       expect(entry.enqueue).to eq(callable)
     end
+
+    it 'returns a frozen entry to prevent external mutation' do
+      entry = registry.add(test_key, test_cron, test_enqueue)
+      expect(entry).to be_frozen
+    end
+
+    it 'prevents mutation of entry key' do
+      entry = registry.add(test_key, test_cron, test_enqueue)
+      expect { entry.key = 'new_key' }.to raise_error(FrozenError)
+    end
+
+    it 'prevents mutation of entry cron' do
+      entry = registry.add(test_key, test_cron, test_enqueue)
+      expect { entry.cron = '0 10 * * *' }.to raise_error(FrozenError)
+    end
+
+    it 'prevents mutation of entry enqueue' do
+      entry = registry.add(test_key, test_cron, test_enqueue)
+      expect { entry.enqueue = proc {} }.to raise_error(FrozenError)
+    end
+
+    it 'protects internal mapping from corruption via find result' do
+      registry.add('original_key', test_cron, test_enqueue)
+      found_entry = registry.find('original_key')
+
+      # Attempt to mutate should raise FrozenError
+      expect { found_entry.key = 'corrupted_key' }.to raise_error(FrozenError)
+
+      # Original key should still work
+      expect(registry.registered?('original_key')).to be true
+      expect(registry.find('original_key')).not_to be_nil
+    end
   end
 
   describe '#remove' do
@@ -122,6 +154,11 @@ RSpec.describe RailsCron::Registry do
     it 'makes the key unregistered' do
       expect { registry.remove(test_key) }.to change { registry.registered?(test_key) }.from(true).to(false)
     end
+
+    it 'returns a frozen entry' do
+      entry = registry.remove(test_key)
+      expect(entry).to be_frozen
+    end
   end
 
   describe '#find' do
@@ -139,6 +176,11 @@ RSpec.describe RailsCron::Registry do
     it "returns nil when entry doesn't exist" do
       expect(registry.find('nonexistent')).to be_nil
     end
+
+    it 'returns a frozen entry' do
+      entry = registry.find(test_key)
+      expect(entry).to be_frozen
+    end
   end
 
   describe '#all' do
@@ -155,6 +197,11 @@ RSpec.describe RailsCron::Registry do
     it 'returns a copy of the entries' do
       registry.add(test_key, test_cron, test_enqueue)
       expect(registry.all).not_to be(registry.all)
+    end
+
+    it 'returns frozen entries' do
+      registry.add(test_key, test_cron, test_enqueue)
+      expect(registry.all.first).to be_frozen
     end
   end
 
@@ -236,6 +283,12 @@ RSpec.describe RailsCron::Registry do
       entries_seen = []
       Thread.new { registry.each { |entry| entries_seen << entry } }.join
       expect(entries_seen.size).to eq(1)
+    end
+
+    it 'yields frozen entries' do
+      registry.add(test_key, test_cron, test_enqueue)
+      registry.add('job2', '0 10 * * *', test_enqueue)
+      expect(registry.each.to_a).to all(be_frozen)
     end
 
     it 'does not deadlock when block calls back into registry' do

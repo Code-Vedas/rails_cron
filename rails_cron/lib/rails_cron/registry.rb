@@ -33,10 +33,13 @@ module RailsCron
     ##
     # Register a new cron job.
     #
+    # Entries are frozen after creation to prevent external mutation
+    # that could corrupt the internal key->entry mapping.
+    #
     # @param key [String] unique identifier for the cron task
     # @param cron [String] cron expression (e.g., "0 9 * * *", "@daily")
     # @param enqueue [Proc, Lambda] callable that executes when cron fires
-    # @return [Entry] the registered entry
+    # @return [Entry] the registered entry (frozen)
     #
     # @raise [ArgumentError] if key is empty, cron is empty, or enqueue is not callable
     # @raise [RegistryError] if key is already registered
@@ -53,7 +56,7 @@ module RailsCron
       @mutex.synchronize do
         raise RegistryError, "Key '#{key}' is already registered" if @entries.key?(key)
 
-        entry = Entry.new(key: key, cron: cron, enqueue: enqueue)
+        entry = Entry.new(key: key, cron: cron, enqueue: enqueue).freeze
         @entries[key] = entry
         entry
       end
