@@ -23,6 +23,20 @@ detectors:
     max_instance_variables: 10
   DataClump:
     enabled: false
+  ManualDispatch:
+    enabled: true
+    exclude:
+      - RailsCron::Registry#callable?
+  UtilityFunction:
+    enabled: true
+    exclude:
+      - RailsCron::Registry#callable?
+  FeatureEnvy:
+    enabled: true
+    exclude:
+      - RailsCron::Configuration#handle_known_key
+      - RailsCron::Configuration#normalize_value
+
 exclude_paths:
   - spec/**/*
   - db/**/*

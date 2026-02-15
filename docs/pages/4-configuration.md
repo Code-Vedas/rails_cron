@@ -73,8 +73,8 @@ RailsCron.configure do |c|
 end
 ```
 
-* Uses `SET NX PX` semantics for distributed locks.
-* Low latency, great for production.
+- Uses `SET NX PX` semantics for distributed locks.
+- Low latency, great for production.
 
 ---
 
@@ -88,8 +88,8 @@ RailsCron.configure do |c|
 end
 ```
 
-* Uses `pg_try_advisory_lock`.
-* Ideal for environments without Redis.
+- Uses `pg_try_advisory_lock`.
+- Ideal for environments without Redis.
 
 ---
 
@@ -101,8 +101,8 @@ RailsCron.configure do |c|
 end
 ```
 
-* In-process only — suitable for **development or testing**.
-* Not safe for multi-node deployments.
+- In-process only — suitable for **development or testing**.
+- Not safe for multi-node deployments.
 
 ---
 
@@ -194,9 +194,9 @@ Distributed locks ensure **only one** node dispatches jobs for each tick.
 
 **Checklist:**
 
-* Use Redis or Postgres lock adapter.
-* Ensure `lease_ttl` is longer than your job dispatch time.
-* Avoid heavy logic inside the `enqueue` lambda — just enqueue your job.
+- Use Redis or Postgres lock adapter.
+- Ensure `lease_ttl` is longer than your job dispatch time.
+- Avoid heavy logic inside the `enqueue` lambda — just enqueue your job.
 
 ---
 

@@ -13,3 +13,31 @@ AllCops:
     - .vscode/**/*
     - vendor/**/* # ignore vendored gems
     - vendor/bundle/**/* # (explicitly, for Bundler’s path)
+Metrics/MethodLength:
+  Max: 60
+Metrics/ModuleLength:
+  Max: 300
+Metrics/BlockLength:
+  Max: 50
+Metrics/ParameterLists:
+  Max: 10
+RSpec/MultipleExpectations:
+  Max: 30
+RSpec/ExampleLength:
+  Max: 50
+Layout/LineLength:
+  Max: 160
+RSpecRails/InferredSpecType:
+  Enabled: false
+Metrics/ClassLength:
+  Max: 250
+Metrics/AbcSize:
+  Max: 30
+RSpec/MultipleMemoizedHelpers:
+  Max: 15
+Metrics/CyclomaticComplexity:
+  Max: 10
+RSpec/NestedGroups:
+  Max: 5
+Metrics/PerceivedComplexity:
+  Max: 15
