@@ -237,6 +237,37 @@ RSpec.describe RailsCron::Registry do
       Thread.new { registry.each { |entry| entries_seen << entry } }.join
       expect(entries_seen.size).to eq(1)
     end
+
+    it 'does not deadlock when block calls back into registry' do
+      registry.add('job1', '0 9 * * *', test_enqueue)
+      registry.add('job2', '0 10 * * *', test_enqueue)
+
+      # This should not deadlock
+      expect do
+        registry.each do |entry|
+          registry.find(entry.key) # Call back into registry
+          registry.registered?(entry.key)
+          registry.size
+        end
+      end.not_to raise_error
+    end
+
+    it 'allows removing entries during iteration without affecting the iteration' do
+      registry.add('job1', '0 9 * * *', test_enqueue)
+      registry.add('job2', '0 10 * * *', test_enqueue)
+      registry.add('job3', '0 11 * * *', test_enqueue)
+
+      keys_seen = []
+      registry.each do |entry|
+        keys_seen << entry.key
+        registry.remove('job2') if entry.key == 'job1'
+      end
+
+      # Should see all 3 entries since snapshot was taken before iteration
+      expect(keys_seen).to contain_exactly('job1', 'job2', 'job3')
+      # But job2 should be removed from registry
+      expect(registry.registered?('job2')).to be false
+    end
   end
 
   describe '#to_a' do

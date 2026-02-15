@@ -153,18 +153,23 @@ module RailsCron
     ##
     # Iterate over all entries with thread-safe access.
     #
+    # Copies entries inside the lock and yields outside to avoid deadlocks
+    # if the block calls back into the registry.
+    #
     # @yield [entry] yields each entry to the block
     # @yieldparam entry [Entry] the cron entry
     # @return [void]
     #
     # @example
     #   registry.each { |entry| puts entry.key }
-    def each(&block)
+    def each(&)
       return enum_for(:each) unless block_given?
 
-      @mutex.synchronize do
-        @entries.each_value(&block)
+      entries_snapshot = @mutex.synchronize do
+        @entries.values.dup
       end
+
+      entries_snapshot.each(&)
     end
 
     ##
