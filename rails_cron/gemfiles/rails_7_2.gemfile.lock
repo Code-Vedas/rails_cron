@@ -431,7 +431,7 @@ PLATFORMS
 DEPENDENCIES
   danger
   i18n-tasks (~> 1.0)
-  rails (~> 7.2.0)
+  rails (~> 7.2)
   rails-i18n (~> 7.0)
   rails_cron!
   reek
