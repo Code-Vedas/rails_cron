@@ -7,7 +7,7 @@
 
 require 'simplecov'
 
-unless ENV['NO_COVERAGE'] == "1"
+unless ENV['NO_COVERAGE'] == '1'
   SimpleCov.start do
     track_files '{app,lib,spec}/**/*.rb'
     add_filter '/spec/'
