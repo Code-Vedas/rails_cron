@@ -31,12 +31,16 @@ module RailsCron
       %w[TERM INT].each do |signal|
         Signal.trap(signal) do
           logger&.info("Received #{signal} signal, stopping scheduler...")
-          stopped = RailsCron.stop!(timeout: 30)
-          logger&.warn('Scheduler did not stop within timeout, thread may still be running') unless stopped
+          begin
+            stopped = RailsCron.stop!(timeout: 30)
+            logger&.warn('Scheduler did not stop within timeout, thread may still be running') unless stopped
+          rescue StandardError => e
+            logger&.error("Error stopping scheduler on #{signal} signal: #{e.full_message}")
+          end
         end
       end
     rescue StandardError => e
-      logger&.warn("Failed to register signal handlers: #{e.message}")
+      logger&.warn("Failed to register signal handlers: #{e.full_message}")
     end
 
     ##
@@ -66,15 +70,19 @@ module RailsCron
       logger = RailsCron.logger
 
       logger&.info('Rails is shutting down, stopping RailsCron scheduler...')
-      stopped = RailsCron.stop!(timeout: 10)
-      return if stopped
+      begin
+        stopped = RailsCron.stop!(timeout: 10)
+        return if stopped
 
-      pid = Process.pid
-      message_array = [
-        'RailsCron scheduler did not stop within timeout.',
-        "Process #{pid} may still be running. You may need to kill it manually with `kill -9 #{pid}`."
-      ]
-      logger&.warn(message_array.join(' '))
+        pid = Process.pid
+        message_array = [
+          'RailsCron scheduler did not stop within timeout.',
+          "Process #{pid} may still be running. You may need to kill it manually with `kill -9 #{pid}`."
+        ]
+        logger&.warn(message_array.join(' '))
+      rescue StandardError => e
+        logger&.error("Error stopping scheduler during shutdown: #{e.message}")
+      end
     end
 
     ##

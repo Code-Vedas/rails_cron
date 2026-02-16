@@ -141,13 +141,25 @@ RSpec.describe RailsCron::Railtie do
       expect(test_logger).not_to have_received(:info)
     end
 
-    it 'propagates exceptions from stop! call through signal handler' do
+    it 'rescues exceptions from stop! call in signal handler and logs them' do
       allow(Signal).to receive(:trap) do |_signal, &block|
-        allow(RailsCron).to receive(:stop!).and_raise(StandardError, 'Stop error')
-        expect { block&.call }.to raise_error(StandardError, 'Stop error')
+        block&.call
       end
+      allow(RailsCron).to receive(:stop!).and_raise(StandardError, 'Stop error')
 
-      described_class.register_signal_handlers
+      expect { described_class.register_signal_handlers }.not_to raise_error
+
+      expect(test_logger).to have_received(:error).with(/Error stopping scheduler.*Stop error/).at_least(:once)
+    end
+
+    it 'rescues exceptions from stop! when logger is nil' do
+      allow(RailsCron).to receive(:logger).and_return(nil)
+      allow(Signal).to receive(:trap) do |_signal, &block|
+        block&.call
+      end
+      allow(RailsCron).to receive(:stop!).and_raise(StandardError, 'Stop error')
+
+      expect { described_class.register_signal_handlers }.not_to raise_error
     end
 
     it 'logs warning when stop times out with logger present' do
@@ -228,6 +240,23 @@ RSpec.describe RailsCron::Railtie do
     it 'does not crash when stop times out with nil logger' do
       allow(RailsCron).to receive_messages(running?: true, logger: nil)
       allow(RailsCron).to receive(:stop!).and_return(false)
+
+      expect { described_class.handle_shutdown }.not_to raise_error
+    end
+
+    it 'rescues exceptions from stop! in shutdown and logs them' do
+      test_logger = instance_spy(Logger)
+      allow(RailsCron).to receive_messages(running?: true, logger: test_logger)
+      allow(RailsCron).to receive(:stop!).and_raise(StandardError, 'Shutdown error')
+
+      expect { described_class.handle_shutdown }.not_to raise_error
+
+      expect(test_logger).to have_received(:error).with(/Error stopping scheduler.*Shutdown error/)
+    end
+
+    it 'rescues exceptions from stop! in shutdown when logger is nil' do
+      allow(RailsCron).to receive_messages(running?: true, logger: nil)
+      allow(RailsCron).to receive(:stop!).and_raise(StandardError, 'Shutdown error')
 
       expect { described_class.handle_shutdown }.not_to raise_error
     end

@@ -26,6 +26,10 @@ detectors:
     max_instance_variables: 10
   DataClump:
     enabled: false
+  DuplicateMethodCall:
+    enabled: true
+    exclude:
+      - RailsCron::Railtie#self.register_signal_handlers
   MissingSafeMethod:
     enabled: true
     exclude:
