@@ -777,7 +777,9 @@ RSpec.describe RailsCron::Coordinator do
     it 'reset clears running state' do
       coordinator.instance_variable_set(:@running, true)
       coordinator.instance_variable_set(:@stop_requested, true)
-      coordinator.instance_variable_set(:@thread, double)
+      thread_double = instance_double(Thread)
+      allow(thread_double).to receive(:join).and_return(nil)
+      coordinator.instance_variable_set(:@thread, thread_double)
 
       coordinator.reset!
 

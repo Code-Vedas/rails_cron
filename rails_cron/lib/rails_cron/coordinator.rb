@@ -114,9 +114,15 @@ module RailsCron
     ##
     # Reset coordinator state for re-entrancy in tests.
     #
+    # Stops any running thread before clearing state to avoid orphaning it.
+    #
     # @return [void]
     # @safe
     def reset!
+      # Stop any running thread first to prevent orphaned threads
+      stop! if running?
+
+      # Now safe to reset all state
       @mutex.synchronize do
         @running = false
         @stop_requested = false
