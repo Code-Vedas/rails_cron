@@ -18,7 +18,7 @@ RSpec.describe RailsCron::Configuration do
       tick_interval: 5,
       window_lookback: 120,
       window_lookahead: 0,
-      lease_ttl: 60,
+      lease_ttl: 125,
       namespace: 'railscron',
       lock_adapter: nil,
       logger: nil,
@@ -40,7 +40,7 @@ RSpec.describe RailsCron::Configuration do
     end
 
     it 'defaults lease_ttl' do
-      expect(config.lease_ttl).to eq(60)
+      expect(config.lease_ttl).to eq(125)
     end
 
     it 'defaults namespace' do
@@ -187,6 +187,36 @@ RSpec.describe RailsCron::Configuration do
       config.lease_ttl = 0
       expect { config.validate! }.to raise_error(RailsCron::ConfigurationError, /tick_interval.*lease_ttl|lease_ttl.*tick_interval/)
     end
+
+    it 'raises when lease_ttl is less than window_lookback + tick_interval' do
+      config.lease_ttl = 50 # 50s
+      config.window_lookback = 120 # 120s
+      config.tick_interval = 5 # 5s
+      # lease_ttl (50) < window_lookback + tick_interval (125)
+      expect do
+        config.validate!
+      end.to raise_error(RailsCron::ConfigurationError, /lease_ttl.*must be >= window_lookback \+ tick_interval.*to prevent duplicate dispatch/)
+    end
+
+    it 'allows lease_ttl equal to window_lookback + tick_interval' do
+      config.lease_ttl = 125 # 125s
+      config.window_lookback = 120 # 120s
+      config.tick_interval = 5 # 5s
+      expect { config.validate! }.not_to raise_error
+    end
+
+    it 'allows lease_ttl greater than window_lookback + tick_interval' do
+      config.lease_ttl = 200
+      config.window_lookback = 120
+      config.tick_interval = 5
+      expect { config.validate! }.not_to raise_error
+    end
+
+    it 'does not add lease_ttl window error when lease_ttl is invalid' do
+      config.lease_ttl = 0
+      config.window_lookback = 120
+      expect { config.validate! }.to raise_error(RailsCron::ConfigurationError, /lease_ttl must be greater than 0/)
+    end
   end
 
   describe '#to_h' do
@@ -203,7 +233,7 @@ RSpec.describe RailsCron::Configuration do
     end
 
     it 'includes default lease_ttl' do
-      expect(config.to_h[:lease_ttl]).to eq(60)
+      expect(config.to_h[:lease_ttl]).to eq(125)
     end
 
     it 'includes default namespace' do

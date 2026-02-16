@@ -13,6 +13,8 @@ RSpec.describe RailsCron do
   let(:logger) { Logger.new(StringIO.new) }
 
   before do
+    # reset_configuration! and reset_registry! automatically invalidate
+    # the memoized coordinator, ensuring fresh instances
     described_class.reset_configuration!
     described_class.reset_registry!
   end
@@ -203,6 +205,136 @@ RSpec.describe RailsCron do
 
     it 'returns false when key is not registered' do
       expect(described_class.registered?(key: 'job:missing')).to be(false)
+    end
+  end
+
+  describe '.coordinator' do
+    it 'returns a Coordinator instance' do
+      expect(described_class.coordinator).to be_a(RailsCron::Coordinator)
+    end
+
+    it 'memoizes the coordinator' do
+      coordinator1 = described_class.coordinator
+      coordinator2 = described_class.coordinator
+      expect(coordinator1).to be(coordinator2)
+    end
+  end
+
+  describe '.reset_coordinator!' do
+    it 'resets the coordinator and returns a new instance' do
+      original_coordinator = described_class.coordinator
+      original_id = original_coordinator.object_id
+
+      new_coordinator = described_class.reset_coordinator!
+
+      expect(new_coordinator.object_id).not_to eq(original_id)
+      expect(new_coordinator).to be_a(RailsCron::Coordinator)
+    end
+
+    it 'stops a running coordinator before resetting' do
+      coordinator = described_class.coordinator
+      coordinator.start!
+
+      expect(coordinator.running?).to be true
+
+      new_coordinator = described_class.reset_coordinator!
+
+      expect(coordinator.running?).to be false
+      expect(new_coordinator).not_to eq(coordinator)
+    end
+
+    it 'does not error when coordinator is not running' do
+      coordinator = described_class.coordinator
+      expect(coordinator.running?).to be false
+
+      expect { described_class.reset_coordinator! }.not_to raise_error
+    end
+
+    it 'handles nil coordinator gracefully' do
+      # Ensure @coordinator is nil without calling coordinator method
+      described_class.instance_variable_set(:@coordinator, nil)
+
+      expect { described_class.reset_coordinator! }.not_to raise_error
+      expect(described_class.coordinator).to be_a(RailsCron::Coordinator)
+    end
+
+    it 'raises error when stop! times out' do
+      coordinator = described_class.coordinator
+      coordinator.start!
+
+      # Stub stop! to return false (timeout)
+      allow(coordinator).to receive(:stop!).and_return(false)
+
+      expect { described_class.reset_coordinator! }.to raise_error(RuntimeError, /Failed to stop coordinator/)
+    end
+  end
+
+  describe '.start!' do
+    it 'starts the coordinator' do
+      coordinator = described_class.coordinator
+      allow(coordinator).to receive(:start!)
+
+      described_class.start!
+
+      expect(coordinator).to have_received(:start!)
+    end
+  end
+
+  describe '.stop!' do
+    it 'stops the coordinator with default timeout' do
+      coordinator = described_class.coordinator
+      allow(coordinator).to receive(:stop!)
+
+      described_class.stop!
+
+      expect(coordinator).to have_received(:stop!).with(timeout: 30)
+    end
+
+    it 'stops the coordinator with custom timeout' do
+      coordinator = described_class.coordinator
+      allow(coordinator).to receive(:stop!)
+
+      described_class.stop!(timeout: 60)
+
+      expect(coordinator).to have_received(:stop!).with(timeout: 60)
+    end
+  end
+
+  describe '.restart!' do
+    it 'restarts the coordinator' do
+      coordinator = described_class.coordinator
+      allow(coordinator).to receive(:restart!)
+
+      described_class.restart!
+
+      expect(coordinator).to have_received(:restart!)
+    end
+  end
+
+  describe '.tick!' do
+    it 'executes a single tick on the coordinator' do
+      coordinator = described_class.coordinator
+      allow(coordinator).to receive(:tick!)
+
+      described_class.tick!
+
+      expect(coordinator).to have_received(:tick!)
+    end
+  end
+
+  describe '.running?' do
+    it 'returns the running status from coordinator' do
+      coordinator = described_class.coordinator
+      allow(coordinator).to receive(:running?).and_return(true)
+
+      expect(described_class.running?).to be(true)
+    end
+
+    it 'returns false when coordinator is not running' do
+      coordinator = described_class.coordinator
+      allow(coordinator).to receive(:running?).and_return(false)
+
+      expect(described_class.running?).to be(false)
     end
   end
 end

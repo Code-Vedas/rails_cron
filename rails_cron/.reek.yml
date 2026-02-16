@@ -8,6 +8,9 @@ detectors:
   TooManyStatements:
     enabled: true
     max_statements: 20
+  TooManyMethods:
+    enabled: true
+    max_methods: 20
   BooleanParameter:
     enabled: false
   ControlParameter:
@@ -23,10 +26,19 @@ detectors:
     max_instance_variables: 10
   DataClump:
     enabled: false
+  DuplicateMethodCall:
+    enabled: true
+    exclude:
+      - RailsCron::Railtie#self.register_signal_handlers
+  MissingSafeMethod:
+    enabled: true
+    exclude:
+      - RailsCron::Coordinator
   ManualDispatch:
     enabled: true
     exclude:
       - RailsCron::Registry#callable?
+      - RailsCron::Railtie#self.chain_previous_handler
   UtilityFunction:
     enabled: true
     exclude:
@@ -36,6 +48,11 @@ detectors:
     exclude:
       - RailsCron::Configuration#handle_known_key
       - RailsCron::Configuration#normalize_value
+      - RailsCron::Coordinator#find_occurrences
+  NilCheck:
+    enabled: true
+    exclude:
+      - RailsCron::Coordinator#stop!
 
 exclude_paths:
   - spec/**/*

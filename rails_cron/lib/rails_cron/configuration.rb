@@ -21,7 +21,7 @@ module RailsCron
       tick_interval: 5,
       window_lookback: 120,
       window_lookahead: 0,
-      lease_ttl: 60,
+      lease_ttl: 125, # Must be >= window_lookback + tick_interval (120 + 5 = 125)
       namespace: 'railscron',
       lock_adapter: nil,
       logger: nil,
@@ -105,6 +105,7 @@ module RailsCron
       add_window_lookahead_error(errors)
       add_lease_ttl_error(errors)
       add_namespace_error(errors)
+      add_lease_ttl_window_error(errors)
       errors
     end
 
@@ -140,6 +141,20 @@ module RailsCron
       return unless @values[:namespace].to_s.strip.empty?
 
       errors << 'namespace cannot be empty'
+    end
+
+    def add_lease_ttl_window_error(errors)
+      lease_ttl = @values[:lease_ttl].to_i
+      window_lookback = @values[:window_lookback].to_i
+      tick_interval = @values[:tick_interval].to_i
+
+      # Skip if individual validations already failed
+      return if lease_ttl <= 0 || window_lookback.negative? || tick_interval <= 0
+
+      minimum_ttl = window_lookback + tick_interval
+      return unless lease_ttl < minimum_ttl
+
+      errors << "lease_ttl (#{lease_ttl}s) must be >= window_lookback + tick_interval (#{minimum_ttl}s) to prevent duplicate dispatch"
     end
 
     def handle_known_key(method_name)
