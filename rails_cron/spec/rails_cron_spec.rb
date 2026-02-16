@@ -13,9 +13,10 @@ RSpec.describe RailsCron do
   let(:logger) { Logger.new(StringIO.new) }
 
   before do
+    # reset_configuration! and reset_registry! automatically invalidate
+    # the memoized coordinator, ensuring fresh instances
     described_class.reset_configuration!
     described_class.reset_registry!
-    described_class.reset_coordinator!
   end
 
   describe '.configuration' do

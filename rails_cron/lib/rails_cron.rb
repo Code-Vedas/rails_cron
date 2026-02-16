@@ -60,6 +60,7 @@ module RailsCron
     # @return [Configuration] a fresh configuration object
     def reset_configuration!
       @configuration = Configuration.new
+      @coordinator = nil # Invalidate coordinator so it rebuilds with new config
     end
 
     ##
@@ -68,6 +69,7 @@ module RailsCron
     # @return [Registry] a fresh registry object
     def reset_registry!
       @registry = Registry.new
+      @coordinator = nil # Invalidate coordinator so it rebuilds with new registry
     end
 
     ##
