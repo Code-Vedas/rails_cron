@@ -67,10 +67,8 @@ module RailsCron
       def acquire(key, _ttl)
         lock_id = calculate_lock_id(key)
 
-        acquired = ActiveRecord::Base.connection.execute(
-          'SELECT pg_try_advisory_lock($1)',
-          [lock_id]
-        ).first['pg_try_advisory_lock']
+        sql = ActiveRecord::Base.sanitize_sql_array(['SELECT pg_try_advisory_lock(?)', lock_id])
+        acquired = ActiveRecord::Base.connection.execute(sql).first['pg_try_advisory_lock']
 
         log_dispatch_attempt(key) if acquired && @log_dispatch
 
@@ -87,10 +85,8 @@ module RailsCron
       def release(key)
         lock_id = calculate_lock_id(key)
 
-        ActiveRecord::Base.connection.execute(
-          'SELECT pg_advisory_unlock($1)',
-          [lock_id]
-        ).first['pg_advisory_unlock']
+        sql = ActiveRecord::Base.sanitize_sql_array(['SELECT pg_advisory_unlock(?)', lock_id])
+        ActiveRecord::Base.connection.execute(sql).first['pg_advisory_unlock']
       rescue StandardError => e
         raise LockAdapterError, "PostgreSQL release failed for #{key}: #{e.message}"
       end
