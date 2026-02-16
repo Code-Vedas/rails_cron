@@ -36,6 +36,9 @@ module RailsCron
         raise ArgumentError, 'redis client must respond to :set and :eval' unless redis.respond_to?(:set) && redis.respond_to?(:eval)
 
         @redis = redis
+        # Store lock values with expiration timestamps to enable safe release and prevent unbounded memory growth.
+        # Since lock keys include fire_time.to_i, each dispatch creates a unique key. In the coordinator's
+        # normal flow, release is never called (TTL is relied upon), so we must expire local entries.
         @lock_values = {}
         @mutex = Mutex.new
       end
@@ -44,7 +47,8 @@ module RailsCron
       # Attempt to acquire a distributed lock in Redis.
       #
       # Uses SET key value NX PX ttl to atomically acquire the lock with TTL.
-      # Stores the lock value locally to enable safe release.
+      # Stores the lock value locally with an expiration time to enable safe release
+      # while preventing unbounded memory growth.
       #
       # @param key [String] the lock key
       # @param ttl [Integer] time-to-live in seconds
@@ -58,7 +62,8 @@ module RailsCron
 
         if result
           @mutex.synchronize do
-            @lock_values[key] = lock_value
+            @lock_values[key] = { value: lock_value, expires_at: Time.now + ttl }
+            prune_expired_lock_values
           end
         end
 
@@ -76,11 +81,13 @@ module RailsCron
       # @param key [String] the lock key to release
       # @return [Boolean] true if released (key was held with our value), false otherwise
       def release(key)
-        lock_value = @mutex.synchronize do
+        lock_entry = @mutex.synchronize do
           @lock_values.delete(key)
         end
 
-        return false unless lock_value
+        return false unless lock_entry
+
+        lock_value = lock_entry[:value]
 
         # Use a Lua script to delete only if value matches
         script = <<~LUA
@@ -101,6 +108,11 @@ module RailsCron
 
       def generate_lock_value
         SecureRandom.uuid
+      end
+
+      def prune_expired_lock_values
+        now = Time.now
+        @lock_values.delete_if { |_key, entry| entry[:expires_at] <= now }
       end
     end
   end
