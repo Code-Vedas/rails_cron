@@ -7,9 +7,10 @@
 
 module RailsCron
   ##
-  # Model for SQLite distributed lock records.
+  # Model for distributed lock records (database-backed).
   #
-  # Used by SQLiteAdapter to store lock state in a database table.
+  # Used by the database-backed adapter (SQLiteAdapter) to store lock state in a database table.
+  # Works with any ActiveRecord-supported SQL database (SQLite, PostgreSQL, MySQL, etc.).
   # Each row represents a held lock with an expiration time.
   class CronLock < ApplicationRecord
     self.table_name = 'rails_cron_locks'

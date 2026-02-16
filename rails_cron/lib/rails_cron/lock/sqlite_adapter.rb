@@ -8,23 +8,26 @@
 module RailsCron
   module Lock
     ##
-    # Distributed lock adapter using SQLite (or any SQL database via ActiveRecord).
+    # Distributed lock adapter using any ActiveRecord-backed SQL database.
     #
-    # This adapter stores locks in a database table with TTL-based expiration.
-    # Uses UNIQUE constraint on the key column to ensure atomicity.
+    # Despite the "SQLiteAdapter" name, this adapter works with any SQL database
+    # supported by Rails (SQLite, PostgreSQL, MySQL, etc.) via ActiveRecord. It stores
+    # locks in a database table with TTL-based expiration and uses a UNIQUE constraint
+    # on the key column to ensure atomicity.
     #
     # Suitable for single-server or development environments. For production
     # multi-node deployments, use Redis or PostgreSQL adapters instead.
     #
-    # @example Using the SQLite adapter
+    # @example Using the adapter with any SQL database
     #   RailsCron.configure do |config|
     #     config.lock_adapter = RailsCron::Lock::SQLiteAdapter.new
     #   end
     class SQLiteAdapter < Adapter
       ##
-      # Initialize a new SQLite adapter.
+      # Initialize a new database-backed adapter.
       #
       # @return [SQLiteAdapter] a new instance
+      #   (Note: Despite the class name, this works with any ActiveRecord SQL database)
 
       ##
       # Attempt to acquire a distributed lock in the database.
