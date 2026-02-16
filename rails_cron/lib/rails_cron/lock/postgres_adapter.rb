@@ -14,8 +14,17 @@ module RailsCron
     # Distributed lock adapter using PostgreSQL advisory locks.
     #
     # This adapter uses PostgreSQL's pg_try_advisory_lock function for
-    # distributed locking across multiple nodes. The lock is automatically
-    # released when the database connection is closed.
+    # distributed locking across multiple nodes. Locks are connection-based
+    # and automatically released when the database connection is closed.
+    #
+    # **IMPORTANT LIMITATIONS:**
+    # - The +ttl+ parameter is ignored. Locks do not auto-expire based on time;
+    #   they persist until the database connection terminates.
+    # - If a process crashes while holding a lock, the lock will remain held until
+    #   the connection timeout occurs (typically 30-60 minutes). For critical systems,
+    #   consider monitoring stale locks or using a time-based fallback mechanism.
+    # - Ensure connection pooling is properly configured to release connections
+    #   promptly when processes terminate.
     #
     # Optionally logs all dispatch attempts to the CronDispatch model for
     # audit/observability purposes.
@@ -48,8 +57,12 @@ module RailsCron
       # to acquire the advisory lock. If successful, records the dispatch attempt
       # if log_dispatch is enabled.
       #
+      # **Note:** The +ttl+ parameter is ignored. PostgreSQL advisory locks are
+      # connection-based and do not auto-expire. The lock will be held until the
+      # database connection is closed. See class documentation for limitations.
+      #
       # @param key [String] the lock key (format: "namespace:dispatch:cron_key:fire_time")
-      # @param ttl [Integer] time-to-live in seconds (note: PG advisory locks don't auto-expire)
+      # @param ttl [Integer] time-to-live in seconds (ignored; see class docs)
       # @return [Boolean] true if acquired, false if held by another process
       def acquire(key, _ttl)
         lock_id = calculate_lock_id(key)
