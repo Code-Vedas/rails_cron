@@ -125,7 +125,7 @@ module RailsCron
       # @param ttl [Integer] unused
       # @yield executes the block immediately
       # @return [Object] the result of the block
-      def with_lock(*)
+      def with_lock(_key, **)
         yield
       end
     end
