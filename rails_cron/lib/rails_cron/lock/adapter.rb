@@ -129,5 +129,9 @@ module RailsCron
         yield
       end
     end
+
+    ##
+    # Error raised when a lock adapter operation fails.
+    class LockAdapterError < StandardError; end
   end
 end
