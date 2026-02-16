@@ -6,7 +6,7 @@ on:
       bundle_gemfile:
         required: false
         type: string
-        description: Path (relative to the repository root) to the Gemfile to use.)
+        description: Path (relative to the repository root) to the Gemfile to use.
       upload_coverage:
         required: false
         type: boolean
