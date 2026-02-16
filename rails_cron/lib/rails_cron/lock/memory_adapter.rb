@@ -32,11 +32,16 @@ module RailsCron
       ##
       # Attempt to acquire a lock in memory.
       #
+      # Opportunistically prunes expired locks to prevent unbounded memory growth.
+      # Since the coordinator generates unique keys per dispatch and relies on TTL
+      # expiration without calling release, this pruning is essential.
+      #
       # @param key [String] the lock key
       # @param ttl [Integer] time-to-live in seconds
       # @return [Boolean] true if acquired (key was free or expired), false if held by another process
       def acquire(key, ttl)
         @mutex.synchronize do
+          prune_expired_locks
           expiration_time = @locks[key]
           current_time = Time.current
           return false if expiration_time && expiration_time > current_time
@@ -55,6 +60,13 @@ module RailsCron
         @mutex.synchronize do
           @locks.delete(key).present?
         end
+      end
+
+      private
+
+      def prune_expired_locks
+        now = Time.current
+        @locks.delete_if { |_key, expiration_time| expiration_time <= now }
       end
     end
   end
