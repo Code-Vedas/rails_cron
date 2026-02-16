@@ -49,6 +49,24 @@ RSpec.describe RailsCron::Lock::PostgresAdapter do
       expect(result).to be(false)
     end
 
+    it 'casts PostgreSQL string "t" to Ruby true' do
+      result_set = [{ 'pg_try_advisory_lock' => 't' }]
+      allow(mock_connection).to receive(:execute).and_return(result_set)
+
+      result = adapter.acquire('railscron:dispatch:job1:1234567890', 60)
+      expect(result).to be(true)
+      expect(result).to be_a(TrueClass)
+    end
+
+    it 'casts PostgreSQL string "f" to Ruby false' do
+      result_set = [{ 'pg_try_advisory_lock' => 'f' }]
+      allow(mock_connection).to receive(:execute).and_return(result_set)
+
+      result = adapter.acquire('railscron:dispatch:job1:1234567890', 60)
+      expect(result).to be(false)
+      expect(result).to be_a(FalseClass)
+    end
+
     it 'sends correct SQL to PostgreSQL' do
       result_set = [{ 'pg_try_advisory_lock' => true }]
       allow(mock_connection).to receive(:execute).and_return(result_set)
@@ -129,6 +147,24 @@ RSpec.describe RailsCron::Lock::PostgresAdapter do
 
       result = adapter.release('lock-key')
       expect(result).to be(false)
+    end
+
+    it 'casts PostgreSQL string "t" to Ruby true' do
+      result_set = [{ 'pg_advisory_unlock' => 't' }]
+      allow(mock_connection).to receive(:execute).and_return(result_set)
+
+      result = adapter.release('lock-key')
+      expect(result).to be(true)
+      expect(result).to be_a(TrueClass)
+    end
+
+    it 'casts PostgreSQL string "f" to Ruby false' do
+      result_set = [{ 'pg_advisory_unlock' => 'f' }]
+      allow(mock_connection).to receive(:execute).and_return(result_set)
+
+      result = adapter.release('lock-key')
+      expect(result).to be(false)
+      expect(result).to be_a(FalseClass)
     end
 
     it 'sends correct SQL to PostgreSQL' do

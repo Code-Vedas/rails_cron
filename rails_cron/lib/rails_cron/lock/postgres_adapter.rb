@@ -68,7 +68,7 @@ module RailsCron
         lock_id = calculate_lock_id(key)
 
         sql = ActiveRecord::Base.sanitize_sql_array(['SELECT pg_try_advisory_lock(?)', lock_id])
-        acquired = ActiveRecord::Base.connection.execute(sql).first['pg_try_advisory_lock']
+        acquired = cast_to_boolean(ActiveRecord::Base.connection.execute(sql).first['pg_try_advisory_lock'])
 
         log_dispatch_attempt(key) if acquired && @log_dispatch
 
@@ -86,12 +86,27 @@ module RailsCron
         lock_id = calculate_lock_id(key)
 
         sql = ActiveRecord::Base.sanitize_sql_array(['SELECT pg_advisory_unlock(?)', lock_id])
-        ActiveRecord::Base.connection.execute(sql).first['pg_advisory_unlock']
+        cast_to_boolean(ActiveRecord::Base.connection.execute(sql).first['pg_advisory_unlock'])
       rescue StandardError => e
         raise LockAdapterError, "PostgreSQL release failed for #{key}: #{e.message}"
       end
 
       private
+
+      def cast_to_boolean(value)
+        # PostgreSQL's `.execute` returns "t"/"f" strings for boolean columns,
+        # not Ruby true/false. Explicitly cast to boolean for proper semantics.
+        case value
+        when 't'
+          true
+        when 'f'
+          false
+        when true, false
+          value
+        else
+          !value.to_s.match?(/\A(f|false|0|)\z/i)
+        end
+      end
 
       def calculate_lock_id(key)
         # Use MD5 hash of the key and convert to 64-bit signed integer
