@@ -126,7 +126,7 @@ module RailsCron
       value = @values[:window_lookahead]
       return unless value.to_i.negative?
 
-      errors << "window_lookahead must be >= 0, got: #{value}"
+      errors << "window_lookahead must be greater than or equal to 0, got: #{value}"
     end
 
     def add_lease_ttl_error(errors)
