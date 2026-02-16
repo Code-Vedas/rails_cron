@@ -81,10 +81,6 @@ name = "prettier"
 name = "radarlint-js"
 
 [[plugin]]
-name = "reek"
-mode = "comment"
-
-[[plugin]]
 name = "ripgrep"
 mode = "comment"
 
