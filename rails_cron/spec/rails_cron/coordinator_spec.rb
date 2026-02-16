@@ -669,7 +669,7 @@ RSpec.describe RailsCron::Coordinator do
       coordinator.send(:acquire_lock, 'test-key')
 
       # Verify lease_ttl was passed
-      expect(adapter).to have_received(:acquire).with('test-key', 60)
+      expect(adapter).to have_received(:acquire).with('test-key', 125)
     end
 
     it 'parse_cron with invalid expression logs and returns nil' do
@@ -1132,7 +1132,7 @@ RSpec.describe RailsCron::Coordinator do
       coordinator.send(:dispatch_if_due, entry, fire_time, fire_time)
 
       # Verify lock key format with correct timestamp
-      expect(adapter).to have_received(:acquire).with(/railscron-dispatch-lock-test-1000/, 60)
+      expect(adapter).to have_received(:acquire).with(/railscron-dispatch-lock-test-1000/, 125)
     end
 
     it 'dispatch_if_due with fire_time equals now dispatches and logs' do
@@ -1146,7 +1146,7 @@ RSpec.describe RailsCron::Coordinator do
       coordinator.send(:dispatch_if_due, entry, fire_time, fire_time)
 
       # Verify lock key format with correct timestamp
-      expect(adapter).to have_received(:acquire).with(/railscron-dispatch-lock-test-1000000/, 60)
+      expect(adapter).to have_received(:acquire).with(/railscron-dispatch-lock-test-1000000/, 125)
     end
 
     it 'calculate_and_dispatch_due_times logs debug with real logger and cron' do
