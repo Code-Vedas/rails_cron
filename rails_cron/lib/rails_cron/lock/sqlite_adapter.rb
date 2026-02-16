@@ -29,8 +29,9 @@ module RailsCron
       ##
       # Attempt to acquire a distributed lock in the database.
       #
-      # Cleans up any expired locks first, then attempts to insert a new lock.
-      # Returns true if insert succeeds, false if key already exists.
+      # Attempts to insert a new lock record. If the key already exists, cleans up
+      # any expired locks and retries once. This avoids unnecessary cleanup in the
+      # common case and reduces the window for race conditions.
       #
       # @param key [String] the lock key
       # @param ttl [Integer] time-to-live in seconds
@@ -40,9 +41,6 @@ module RailsCron
         expires_at = now + ttl.seconds
 
         begin
-          # Clean up any expired locks first
-          RailsCron::CronLock.cleanup_expired
-
           # Try to create a new lock record
           RailsCron::CronLock.create!(
             key: key,
@@ -50,9 +48,20 @@ module RailsCron
             expires_at: expires_at
           )
           true
-        rescue ActiveRecord::RecordNotUnique, ActiveRecord::RecordInvalid
-          # Key already exists - another process holds the lock
-          false
+        rescue ActiveRecord::RecordInvalid
+          # Key already exists (uniqueness validation failed) or other validation failed.
+          # Always clean up any expired locks and retry once in case the existing lock was expired.
+          RailsCron::CronLock.cleanup_expired
+          begin
+            RailsCron::CronLock.create!(
+              key: key,
+              acquired_at: now,
+              expires_at: expires_at
+            )
+            true
+          rescue ActiveRecord::RecordInvalid
+            false
+          end
         rescue StandardError => e
           raise LockAdapterError, "SQLite acquire failed for #{key}: #{e.message}"
         end

@@ -55,7 +55,7 @@ RSpec.describe RailsCron::Lock::PostgresAdapter do
 
       adapter.acquire('test-key', 60)
 
-      expect(mock_connection).to have_received(:execute).with(/pg_try_advisory_lock/)
+      expect(mock_connection).to have_received(:execute).with('SELECT pg_try_advisory_lock($1)', anything)
     end
 
     it 'uses a deterministic hash for the lock ID' do
@@ -136,7 +136,7 @@ RSpec.describe RailsCron::Lock::PostgresAdapter do
 
       adapter.release('test-key')
 
-      expect(mock_connection).to have_received(:execute).with(/pg_advisory_unlock/)
+      expect(mock_connection).to have_received(:execute).with('SELECT pg_advisory_unlock($1)', anything)
     end
 
     it 'raises LockAdapterError on database failure' do

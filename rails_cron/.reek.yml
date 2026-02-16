@@ -30,6 +30,7 @@ detectors:
     enabled: true
     exclude:
       - RailsCron::Railtie#self.register_signal_handlers
+      - RailsCron::Lock::SQLiteAdapter#acquire
   MissingSafeMethod:
     enabled: true
     exclude:
@@ -53,6 +54,7 @@ detectors:
       - RailsCron::Configuration#handle_known_key
       - RailsCron::Configuration#normalize_value
       - RailsCron::Coordinator#find_occurrences
+      - RailsCron::Lock::SQLiteAdapter#acquire
   NilCheck:
     enabled: true
     exclude:

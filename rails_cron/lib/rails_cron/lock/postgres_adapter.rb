@@ -55,7 +55,7 @@ module RailsCron
         lock_id = calculate_lock_id(key)
 
         acquired = ActiveRecord::Base.connection.execute(
-          "SELECT pg_try_advisory_lock($1)",
+          'SELECT pg_try_advisory_lock($1)',
           [lock_id]
         ).first['pg_try_advisory_lock']
 
@@ -75,7 +75,7 @@ module RailsCron
         lock_id = calculate_lock_id(key)
 
         ActiveRecord::Base.connection.execute(
-          "SELECT pg_advisory_unlock($1)",
+          'SELECT pg_advisory_unlock($1)',
           [lock_id]
         ).first['pg_advisory_unlock']
       rescue StandardError => e
