@@ -48,6 +48,10 @@ RSpec.describe RailsCron::Railtie do
       described_class.ensure_logger!
 
       expect(RailsCron.configuration.logger).to be_nil
+
+      # Restore original Rails.logger before after hooks run
+      # to prevent interference with RSpec-Rails cleanup
+      allow(Rails).to receive(:logger).and_call_original
     end
   end
 

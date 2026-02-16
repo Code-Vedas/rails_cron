@@ -73,7 +73,6 @@ RSpec.describe RailsCron::Coordinator do
     it 'stops the coordinator when running and returns true' do
       coordinator.start!
       result = coordinator.stop!
-      sleep 0.1 # Allow thread to finish
       expect(coordinator.running?).to be false
       expect(result).to be true
     end
@@ -156,11 +155,31 @@ RSpec.describe RailsCron::Coordinator do
   describe '#run_loop' do
     it 'starts the background loop' do
       coordinator.start!
-      sleep 0.1
 
       expect(coordinator.running?).to be true
 
       coordinator.stop!
+    end
+
+    it 'executes tick and sleeps in the loop' do
+      tick_executed = false
+      sleep_executed = false
+
+      # Stub internal methods to track loop execution and avoid delays
+      # rubocop:disable RSpec/SubjectStub
+      allow(coordinator).to receive(:execute_tick) { tick_executed = true }
+      allow(coordinator).to receive(:sleep_until_next_tick) { sleep_executed = true }
+      # rubocop:enable RSpec/SubjectStub
+
+      coordinator.start!
+
+      # Wait for one loop iteration
+      sleep 0.01 until tick_executed && sleep_executed
+
+      coordinator.stop!
+
+      expect(tick_executed).to be true
+      expect(sleep_executed).to be true
     end
   end
 
