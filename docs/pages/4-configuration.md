@@ -17,7 +17,7 @@ All configuration options are optional and can be customized per environment.
 # config/initializers/rails_cron.rb
 RailsCron.configure do |c|
   # Choose your distributed lock adapter
-  # c.lock_adapter = RailsCron::Lock::RedisAdapter.new(redis)
+  # c.lock_adapter = RailsCron::Lock::RedisAdapter.new(Redis.new(url: ENV["REDIS_URL"]))
   # c.lock_adapter = RailsCron::Lock::PostgresAdapter.new
   # c.lock_adapter = RailsCron::Lock::MemoryAdapter.new # single-node only (not for production)
 
