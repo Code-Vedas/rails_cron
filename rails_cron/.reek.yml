@@ -38,6 +38,7 @@ detectors:
     enabled: true
     exclude:
       - RailsCron::Registry#callable?
+      - RailsCron::Railtie#self.chain_previous_handler
   UtilityFunction:
     enabled: true
     exclude:

@@ -60,10 +60,11 @@ RSpec.describe RailsCron::Railtie do
 
     it 'registers signal handlers for TERM and INT signals' do
       expecting_traps = []
-      allow(Signal).to receive(:trap) do |signal, &block|
-        expecting_traps << signal
+      allow(Signal).to receive(:trap) do |signal, _handler = nil, &block|
+        expecting_traps << signal if signal.is_a?(String)
         # Simulate the trap block being called
         block&.call
+        nil
       end
       allow(RailsCron).to receive(:stop!)
 
@@ -73,9 +74,10 @@ RSpec.describe RailsCron::Railtie do
     end
 
     it 'calls RailsCron.stop! with timeout 30 when signal is received' do
-      signal_block = nil
-      allow(Signal).to receive(:trap) do |_signal, &block|
-        signal_block = block
+      signal_blocks = []
+      allow(Signal).to receive(:trap) do |_signal, _handler = nil, &block|
+        signal_blocks << block if block
+        nil
       end
 
       called_with = []
@@ -85,15 +87,16 @@ RSpec.describe RailsCron::Railtie do
 
       described_class.register_signal_handlers
 
-      # Call the block to simulate signal
-      signal_block&.call
+      # Call the last block to simulate signal (the one with our handler)
+      signal_blocks.last&.call if signal_blocks.any?
 
       expect(called_with).to include(timeout: 30)
     end
 
     it 'logs the signal when logger is available' do
-      allow(Signal).to receive(:trap) do |_signal, &block|
+      allow(Signal).to receive(:trap) do |_signal, _handler = nil, &block|
         block&.call
+        nil
       end
       allow(RailsCron).to receive(:stop!).and_return(true)
 
@@ -121,8 +124,9 @@ RSpec.describe RailsCron::Railtie do
 
     it 'handles signal trapping when logger is nil' do
       allow(RailsCron).to receive(:logger).and_return(nil)
-      allow(Signal).to receive(:trap) do |_signal, &block|
+      allow(Signal).to receive(:trap) do |_signal, _handler = nil, &block|
         block&.call
+        nil
       end
       allow(RailsCron).to receive(:stop!)
 
@@ -131,8 +135,9 @@ RSpec.describe RailsCron::Railtie do
 
     it 'does not call logger.info when logger is nil' do
       allow(RailsCron).to receive(:logger).and_return(nil)
-      allow(Signal).to receive(:trap) do |_signal, &block|
+      allow(Signal).to receive(:trap) do |_signal, _handler = nil, &block|
         block&.call
+        nil
       end
       allow(RailsCron).to receive(:stop!)
 
@@ -142,8 +147,9 @@ RSpec.describe RailsCron::Railtie do
     end
 
     it 'rescues exceptions from stop! call in signal handler and logs them' do
-      allow(Signal).to receive(:trap) do |_signal, &block|
+      allow(Signal).to receive(:trap) do |_signal, _handler = nil, &block|
         block&.call
+        nil
       end
       allow(RailsCron).to receive(:stop!).and_raise(StandardError, 'Stop error')
 
@@ -154,8 +160,9 @@ RSpec.describe RailsCron::Railtie do
 
     it 'rescues exceptions from stop! when logger is nil' do
       allow(RailsCron).to receive(:logger).and_return(nil)
-      allow(Signal).to receive(:trap) do |_signal, &block|
+      allow(Signal).to receive(:trap) do |_signal, _handler = nil, &block|
         block&.call
+        nil
       end
       allow(RailsCron).to receive(:stop!).and_raise(StandardError, 'Stop error')
 
@@ -163,8 +170,9 @@ RSpec.describe RailsCron::Railtie do
     end
 
     it 'logs warning when stop times out with logger present' do
-      allow(Signal).to receive(:trap) do |_signal, &block|
+      allow(Signal).to receive(:trap) do |_signal, _handler = nil, &block|
         block&.call
+        nil
       end
       allow(RailsCron).to receive(:stop!).and_return(false)
 
@@ -174,10 +182,151 @@ RSpec.describe RailsCron::Railtie do
     end
 
     it 'does not crash when stop times out with nil logger' do
-      allow(Signal).to receive(:trap) do |_signal, &block|
+      allow(Signal).to receive(:trap) do |_signal, _handler = nil, &block|
         block&.call
+        nil
       end
       allow(RailsCron).to receive_messages(logger: nil, stop!: false)
+
+      expect { described_class.register_signal_handlers }.not_to raise_error
+    end
+
+    it 'chains previous callable signal handlers' do
+      previous_handler_called = []
+      previous_handler = proc { previous_handler_called << true }
+
+      trap_count = 0
+      allow(Signal).to receive(:trap) do |_signal, _handler = nil, &block|
+        trap_count += 1
+        case trap_count
+        when 1 # First call to get the old handler (with 'IGNORE')
+          previous_handler
+        when 2 # Second call to restore old handler
+          nil
+        when 3 # Third call to install our new handler
+          block&.call
+          nil
+        end
+      end
+      allow(RailsCron).to receive(:stop!).and_return(true)
+
+      described_class.register_signal_handlers
+
+      expect(previous_handler_called).not_to be_empty
+    end
+
+    it 'logs debug message for string command handlers' do
+      trap_count = 0
+      allow(Signal).to receive(:trap) do |_signal, _handler = nil, &block|
+        trap_count += 1
+        case trap_count
+        when 1 # First call returns string command
+          'some_command'
+        when 2 # Second call to restore
+          nil
+        when 3 # Third call to install our handler
+          block&.call
+          nil
+        end
+      end
+      allow(RailsCron).to receive(:stop!).and_return(true)
+
+      described_class.register_signal_handlers
+
+      expect(test_logger).to have_received(:debug).with(/Previous.*handler was a command/).at_least(:once)
+    end
+
+    it 'does not call DEFAULT or IGNORE handlers' do
+      trap_count = 0
+      allow(Signal).to receive(:trap) do |_signal, _handler = nil, &block|
+        trap_count += 1
+        case trap_count
+        when 1, 4 # First call for each signal returns DEFAULT
+          'DEFAULT'
+        when 2, 5 # Second call to restore
+          nil
+        when 3, 6 # Third call to install our handler
+          block&.call
+          nil
+        end
+      end
+      allow(RailsCron).to receive(:stop!).and_return(true)
+
+      described_class.register_signal_handlers
+
+      expect(test_logger).not_to have_received(:debug).with(/Previous.*handler was a command/)
+    end
+
+    it 'handles nil previous handler gracefully' do
+      trap_count = 0
+      allow(Signal).to receive(:trap) do |_signal, _handler = nil, &block|
+        trap_count += 1
+        case trap_count
+        when 1, 3 # First call for each signal returns nil
+        when 2, 4 # Second call to install our handler (restore skipped for nil)
+          block&.call
+        end
+        nil
+      end
+      allow(RailsCron).to receive(:stop!).and_return(true)
+
+      expect { described_class.register_signal_handlers }.not_to raise_error
+    end
+
+    it 'handles IGNORE previous handler without logging' do
+      trap_count = 0
+      allow(Signal).to receive(:trap) do |_signal, _handler = nil, &block|
+        trap_count += 1
+        case trap_count
+        when 1, 3 # First call for each signal returns IGNORE
+          'IGNORE'
+        when 2, 4 # Second call to install our handler (restore skipped for IGNORE)
+          block&.call
+          nil
+        end
+      end
+      allow(RailsCron).to receive(:stop!).and_return(true)
+
+      described_class.register_signal_handlers
+
+      expect(test_logger).not_to have_received(:debug)
+    end
+
+    it 'handles non-callable non-string previous handler gracefully' do
+      trap_count = 0
+      allow(Signal).to receive(:trap) do |_signal, _handler = nil, &block|
+        trap_count += 1
+        case trap_count
+        when 1, 4 # First call for each signal returns a symbol (non-callable, non-string)
+          :some_symbol
+        when 2, 5 # Second call to restore
+          nil
+        when 3, 6 # Third call to install our handler
+          block&.call
+          nil
+        end
+      end
+      allow(RailsCron).to receive(:stop!).and_return(true)
+
+      expect { described_class.register_signal_handlers }.not_to raise_error
+      expect(test_logger).not_to have_received(:debug)
+    end
+
+    it 'handles string command handler when logger is nil' do
+      trap_count = 0
+      allow(Signal).to receive(:trap) do |_signal, _handler = nil, &block|
+        trap_count += 1
+        case trap_count
+        when 1, 4 # First call for each signal returns string command
+          'some_command'
+        when 2, 5 # Second call to restore
+          nil
+        when 3, 6 # Third call to install our handler
+          block&.call
+          nil
+        end
+      end
+      allow(RailsCron).to receive_messages(logger: nil, stop!: true)
 
       expect { described_class.register_signal_handlers }.not_to raise_error
     end
