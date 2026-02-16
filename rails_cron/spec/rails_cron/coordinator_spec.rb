@@ -561,7 +561,7 @@ RSpec.describe RailsCron::Coordinator do
   describe '#generate_lock_key' do
     it 'generates lock key with namespace, cron_key, and fire_time' do
       key = coordinator.send(:generate_lock_key, 'job', Time.at(1_234_567_890))
-      expect(key).to eq('railscron-dispatch-lock-job-1234567890')
+      expect(key).to eq('railscron:dispatch:job:1234567890')
     end
   end
 
@@ -978,7 +978,7 @@ RSpec.describe RailsCron::Coordinator do
 
       key = coordinator.send(:generate_lock_key, 'job', Time.at(1000))
 
-      expect(key).to start_with('custom-dispatch-lock-')
+      expect(key).to start_with('custom:dispatch:')
     end
 
     it 'start! initializes running state correctly' do
@@ -1137,7 +1137,7 @@ RSpec.describe RailsCron::Coordinator do
       coordinator.send(:dispatch_if_due, entry, fire_time, fire_time)
 
       # Verify lock key format with correct timestamp
-      expect(adapter).to have_received(:acquire).with(/railscron-dispatch-lock-test-1000/, 125)
+      expect(adapter).to have_received(:acquire).with(/railscron:dispatch:test:1000/, 125)
     end
 
     it 'dispatch_if_due with fire_time equals now dispatches and logs' do
@@ -1151,7 +1151,7 @@ RSpec.describe RailsCron::Coordinator do
       coordinator.send(:dispatch_if_due, entry, fire_time, fire_time)
 
       # Verify lock key format with correct timestamp
-      expect(adapter).to have_received(:acquire).with(/railscron-dispatch-lock-test-1000000/, 125)
+      expect(adapter).to have_received(:acquire).with(/railscron:dispatch:test:1000000/, 125)
     end
 
     it 'calculate_and_dispatch_due_times logs debug with real logger and cron' do

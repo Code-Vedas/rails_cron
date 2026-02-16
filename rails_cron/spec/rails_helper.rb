@@ -7,13 +7,15 @@
 
 require 'simplecov'
 
-SimpleCov.start do
-  track_files '{app,lib,spec}/**/*.rb'
-  add_filter '/spec/'
-  add_filter %r{^/lib/.*/version\.rb$}
+unless ENV['NO_COVERAGE'] == '1'
+  SimpleCov.start do
+    track_files '{app,lib,spec}/**/*.rb'
+    add_filter '/spec/'
+    add_filter %r{^/lib/.*/version\.rb$}
 
-  enable_coverage :branch
-  minimum_coverage 100
+    enable_coverage :branch
+    minimum_coverage 100
+  end
 end
 require 'rails'
 ENV['RAILS_ENV'] ||= 'test'
@@ -36,6 +38,10 @@ RSpec.configure do |config|
   config.use_transactional_fixtures = false
   config.fixture_paths = [Rails.root.join('spec/fixtures')]
   config.filter_rails_from_backtrace!
+
+  config.before do
+    RailsCron::CronDispatch.delete_all
+  end
 end
 
 Shoulda::Matchers.configure do |config|

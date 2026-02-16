@@ -86,9 +86,8 @@ jobs:
             name: Rails Edge
 
     needs: [lint, reek]
-    uses: ./.github/workflows/ruby-unit-tests.yml
+    uses: ./.github/workflows/ruby-tests.yml
     with:
-      rspec_task: bin/rspec-unit --profile 10
       upload_coverage: ${{ matrix.gemfile == 'rails_8_0.gemfile' }}
       bundle_gemfile: rails_cron/gemfiles/${{ matrix.gemfile }}
     secrets:

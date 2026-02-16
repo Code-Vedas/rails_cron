@@ -9,6 +9,8 @@ group :development, :test do
   gem 'danger'
   gem 'faraday-retry'
   gem 'i18n-tasks', '~> 1.0'
+  gem 'pg', '~> 1.1'
+  gem 'redis', '~> 5.0'
   gem 'reek'
   gem 'rspec-rails'
   gem 'rubocop-factory_bot'
@@ -21,6 +23,7 @@ group :development, :test do
 end
 
 group :test do
+  gem 'fakeredis'
   gem 'simplecov', require: false
   gem 'simplecov-console', require: false
 end

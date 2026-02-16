@@ -30,6 +30,7 @@ detectors:
     enabled: true
     exclude:
       - RailsCron::Railtie#self.register_signal_handlers
+      - RailsCron::Lock::SQLiteAdapter#acquire
   MissingSafeMethod:
     enabled: true
     exclude:
@@ -39,20 +40,26 @@ detectors:
     exclude:
       - RailsCron::Registry#callable?
       - RailsCron::Railtie#self.chain_previous_handler
+      - RailsCron::Lock::RedisAdapter#initialize
   UtilityFunction:
     enabled: true
     exclude:
       - RailsCron::Registry#callable?
+      - RailsCron::Lock::PostgresAdapter#calculate_lock_id
+      - RailsCron::Lock::PostgresAdapter#parse_lock_key
+      - RailsCron::Lock::RedisAdapter#generate_lock_value
   FeatureEnvy:
     enabled: true
     exclude:
       - RailsCron::Configuration#handle_known_key
       - RailsCron::Configuration#normalize_value
       - RailsCron::Coordinator#find_occurrences
+      - RailsCron::Lock::SQLiteAdapter#acquire
   NilCheck:
     enabled: true
     exclude:
       - RailsCron::Coordinator#stop!
+      - RailsCron::Lock::RedisAdapter#initialize
 
 exclude_paths:
   - spec/**/*

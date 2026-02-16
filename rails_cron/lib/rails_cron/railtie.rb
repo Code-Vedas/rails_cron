@@ -69,6 +69,13 @@ module RailsCron
     end
 
     ##
+    # Autoload paths for RailsCron models and other components
+    initializer 'rails_cron.autoload' do |_app|
+      models_path = File.expand_path('../../app/models', __dir__)
+      Rails.autoloaders.main.push_dir(models_path)
+    end
+
+    ##
     # Initialize RailsCron when Rails boots.
     # Sets the default logger to Rails.logger if available.
     initializer 'rails_cron.configuration' do |_app|

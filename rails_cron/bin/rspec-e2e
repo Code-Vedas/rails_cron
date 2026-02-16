@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ADAPTER="${1:-nshift}"  # default adapter
+shift || true            # remove first arg, leave the rest in "$@"
+
+# Run RSpec with environment variables and proper tags
+E2E="1" NO_COVERAGE=1 bin/rspec --tag "integration:${ADAPTER}" "$@"
