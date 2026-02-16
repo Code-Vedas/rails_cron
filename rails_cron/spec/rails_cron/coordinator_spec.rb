@@ -211,15 +211,21 @@ RSpec.describe RailsCron::Coordinator do
 
   describe '#execute_tick' do
     it 'iterates through registry entries' do
-      call_count = [0]
-      entry_block = kw_enqueue { call_count[0] += 1 }
+      entry_block = kw_enqueue
       registry.add(key: 'job1', cron: '* * * * *', enqueue: entry_block)
       registry.add(key: 'job2', cron: '0 * * * *', enqueue: entry_block)
 
+      # Spy on calculate_and_dispatch_due_times to verify it's called for each entry
+      # rubocop:disable RSpec/SubjectStub
+      allow(coordinator).to receive(:calculate_and_dispatch_due_times).and_call_original
+      # rubocop:enable RSpec/SubjectStub
+
       coordinator.send(:execute_tick)
 
-      # Verify execute_tick processed entries and called enqueue callbacks
-      expect(call_count[0]).to be >= 0
+      # Verify execute_tick processed both registry entries
+      # rubocop:disable RSpec/SubjectStub
+      expect(coordinator).to have_received(:calculate_and_dispatch_due_times).twice
+      # rubocop:enable RSpec/SubjectStub
     end
 
     it 'rescues StandardError and logs with logger' do
