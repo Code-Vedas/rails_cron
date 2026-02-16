@@ -39,6 +39,7 @@ detectors:
     exclude:
       - RailsCron::Registry#callable?
       - RailsCron::Railtie#self.chain_previous_handler
+      - RailsCron::Lock::RedisAdapter#initialize
   UtilityFunction:
     enabled: true
     exclude:
@@ -56,6 +57,7 @@ detectors:
     enabled: true
     exclude:
       - RailsCron::Coordinator#stop!
+      - RailsCron::Lock::RedisAdapter#initialize
 
 exclude_paths:
   - spec/**/*

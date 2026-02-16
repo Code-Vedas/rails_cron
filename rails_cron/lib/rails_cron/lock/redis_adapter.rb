@@ -28,11 +28,12 @@ module RailsCron
       ##
       # Initialize a new Redis adapter.
       #
-      # @param redis [Redis] a Redis client instance
-      # @raise [ArgumentError] if redis is not provided or invalid
+      # @param redis [Object] a Redis-compatible client instance
+      # @raise [ArgumentError] if redis is not provided or does not implement the required interface
       def initialize(redis)
         super()
-        raise ArgumentError, 'redis client is required' unless redis.is_a?(Redis)
+        raise ArgumentError, 'redis client is required' if redis.nil?
+        raise ArgumentError, 'redis client must respond to :set and :eval' unless redis.respond_to?(:set) && redis.respond_to?(:eval)
 
         @redis = redis
         @lock_values = {}

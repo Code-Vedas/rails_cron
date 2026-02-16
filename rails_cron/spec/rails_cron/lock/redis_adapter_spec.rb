@@ -23,7 +23,7 @@ RSpec.describe RailsCron::Lock::RedisAdapter do
 
     it 'requires a client with set method' do
       invalid_client = Object.new
-      expect { described_class.new(invalid_client) }.to raise_error(ArgumentError, /redis client is required/)
+      expect { described_class.new(invalid_client) }.to raise_error(ArgumentError, /redis client must respond to :set and :eval/)
     end
 
     it 'accepts a valid redis client' do
