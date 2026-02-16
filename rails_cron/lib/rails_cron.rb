@@ -8,6 +8,8 @@
 require 'rails_cron/version'
 require 'rails_cron/configuration'
 require 'rails_cron/registry'
+require 'rails_cron/lock/adapter'
+require 'rails_cron/coordinator'
 require 'rails_cron/railtie'
 
 ##
@@ -45,6 +47,14 @@ module RailsCron
     end
 
     ##
+    # Get the coordinator instance.
+    #
+    # @return [Coordinator] the global coordinator object
+    def coordinator
+      @coordinator ||= Coordinator.new(configuration: configuration, registry: registry)
+    end
+
+    ##
     # Reset configuration to defaults. Primarily used in tests.
     #
     # @return [Configuration] a fresh configuration object
@@ -58,6 +68,16 @@ module RailsCron
     # @return [Registry] a fresh registry object
     def reset_registry!
       @registry = Registry.new
+    end
+
+    ##
+    # Reset coordinator to initial state. Primarily used in tests.
+    #
+    # @return [Coordinator] a fresh coordinator object
+    def reset_coordinator!
+      coordinator.reset!
+      @coordinator = nil
+      coordinator
     end
 
     ##
@@ -130,6 +150,75 @@ module RailsCron
     #   RailsCron.registered?(key: "reports:daily") # => true
     def registered?(key:)
       registry.registered?(key)
+    end
+
+    ##
+    # Start the scheduler background thread.
+    #
+    # The coordinator will calculate due fire times for each registered cron
+    # on each tick and attempt to dispatch work.
+    #
+    # @return [Thread] the started thread, or nil if already running
+    #
+    # @example
+    #   RailsCron.start!
+    def start!
+      coordinator.start!
+    end
+
+    ##
+    # Stop the scheduler gracefully.
+    #
+    # Signals the coordinator to stop after the current tick completes,
+    # then waits for the thread to finish.
+    #
+    # @param timeout [Integer] seconds to wait for graceful shutdown (default: 30)
+    # @return [Boolean] true if stopped successfully
+    #
+    # @example
+    #   RailsCron.stop!
+    # @example
+    #   RailsCron.stop!(timeout: 60)
+    def stop!(timeout: 30)
+      coordinator.stop!(timeout: timeout)
+    end
+
+    ##
+    # Check if the scheduler is currently running.
+    #
+    # @return [Boolean] true if running, false otherwise
+    #
+    # @example
+    #   if RailsCron.running?
+    #     puts "Scheduler is active"
+    #   end
+    def running?
+      coordinator.running?
+    end
+
+    ##
+    # Restart the scheduler (stop then start).
+    #
+    # @return [Thread] the started thread
+    #
+    # @example
+    #   RailsCron.restart!
+    def restart!
+      coordinator.restart!
+    end
+
+    ##
+    # Execute a single scheduler tick manually.
+    #
+    # This is useful for testing and Rake tasks that want to trigger
+    # the scheduler without running the background loop.
+    #
+    # @return [void]
+    #
+    # @example
+    #   RailsCron.tick!
+    def tick!
+      coordinator.tick!
     end
 
     ##
