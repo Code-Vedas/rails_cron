@@ -107,7 +107,7 @@ jobs:
         working-directory: ${{ env.APP_DIR }}
         env:
           RAILS_ENV: test
-          DATABASE_URL: mysql2://root:rootROOT!1@localhost:3306/rails_crons_test
+          DATABASE_URL: mysql2://root:rootROOT!1@127.0.0.1:3306/rails_crons_test
         run: |
           bin/rails db:drop || true
           bin/rails db:create
