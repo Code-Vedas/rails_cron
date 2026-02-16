@@ -69,15 +69,40 @@ RSpec.describe RailsCron::Coordinator do
   end
 
   describe '#stop!' do
-    it 'stops the coordinator when running' do
+    it 'stops the coordinator when running and returns true' do
       coordinator.start!
-      coordinator.stop!
+      result = coordinator.stop!
       sleep 0.1 # Allow thread to finish
       expect(coordinator.running?).to be false
+      expect(result).to be true
     end
 
-    it 'does not raise when not running' do
-      expect { coordinator.stop! }.not_to raise_error
+    it 'returns true when not running' do
+      result = coordinator.stop!
+      expect(result).to be true
+    end
+
+    it 'returns false when thread does not stop within timeout' do
+      coordinator.instance_variable_set(:@running, true)
+      thread_double = instance_double(Thread)
+      allow(thread_double).to receive(:join).and_return(nil)
+      coordinator.instance_variable_set(:@thread, thread_double)
+
+      result = coordinator.stop!(timeout: 1)
+
+      expect(result).to be false
+    end
+
+    it 'does not clear state when thread does not stop within timeout' do
+      coordinator.instance_variable_set(:@running, true)
+      thread_double = instance_double(Thread)
+      allow(thread_double).to receive(:join).and_return(nil)
+      coordinator.instance_variable_set(:@thread, thread_double)
+
+      coordinator.stop!(timeout: 1)
+
+      expect(coordinator.running?).to be true
+      expect(coordinator.instance_variable_get(:@thread)).to eq(thread_double)
     end
   end
 
@@ -778,7 +803,7 @@ RSpec.describe RailsCron::Coordinator do
       coordinator.instance_variable_set(:@running, true)
       coordinator.instance_variable_set(:@stop_requested, true)
       thread_double = instance_double(Thread)
-      allow(thread_double).to receive(:join).and_return(nil)
+      allow(thread_double).to receive(:join).and_return(thread_double) # Successful join
       coordinator.instance_variable_set(:@thread, thread_double)
 
       coordinator.reset!
@@ -786,6 +811,15 @@ RSpec.describe RailsCron::Coordinator do
       expect(coordinator.running?).to be false
       expect(coordinator.send(:stop_requested?)).to be false
       expect(coordinator.instance_variable_get(:@thread)).to be_nil
+    end
+
+    it 'reset raises error when thread cannot be stopped' do
+      coordinator.instance_variable_set(:@running, true)
+      thread_double = instance_double(Thread)
+      allow(thread_double).to receive(:join).and_return(nil) # Timeout
+      coordinator.instance_variable_set(:@thread, thread_double)
+
+      expect { coordinator.reset! }.to raise_error(RuntimeError, /Failed to stop coordinator thread/)
     end
 
     it 'stop with timeout parameter passes value to thread join' do

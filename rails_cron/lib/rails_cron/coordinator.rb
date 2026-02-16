@@ -74,7 +74,11 @@ module RailsCron
       request_stop
 
       # Wait for thread to finish outside the lock
-      @thread&.join(timeout)
+      result = @thread&.join(timeout)
+
+      # If we had a thread and join timed out, thread is still alive
+      return false if @thread && result.nil?
+
       @thread = nil
       @mutex.synchronize { @running = false }
 
@@ -115,12 +119,17 @@ module RailsCron
     # Reset coordinator state for re-entrancy in tests.
     #
     # Stops any running thread before clearing state to avoid orphaning it.
+    # Raises an error if the thread cannot be stopped within the timeout.
     #
     # @return [void]
+    # @raise [RuntimeError] if stop! times out
     # @safe
     def reset!
       # Stop any running thread first to prevent orphaned threads
-      stop! if running?
+      if running?
+        stopped = stop!
+        raise 'Failed to stop coordinator thread within timeout' unless stopped
+      end
 
       # Now safe to reset all state
       @mutex.synchronize do

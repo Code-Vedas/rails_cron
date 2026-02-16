@@ -95,12 +95,13 @@ RSpec.describe RailsCron::Railtie do
       allow(Signal).to receive(:trap) do |_signal, &block|
         block&.call
       end
-      allow(RailsCron).to receive(:stop!)
+      allow(RailsCron).to receive(:stop!).and_return(true)
 
       described_class.register_signal_handlers
 
       # Called once for TERM and once for INT
       expect(test_logger).to have_received(:info).with(/Received.*signal/).at_least(:once)
+      expect(test_logger).not_to have_received(:warn)
     end
 
     it 'handles StandardError when registering signals' do
@@ -148,6 +149,26 @@ RSpec.describe RailsCron::Railtie do
 
       described_class.register_signal_handlers
     end
+
+    it 'logs warning when stop times out with logger present' do
+      allow(Signal).to receive(:trap) do |_signal, &block|
+        block&.call
+      end
+      allow(RailsCron).to receive(:stop!).and_return(false)
+
+      described_class.register_signal_handlers
+
+      expect(test_logger).to have_received(:warn).with(/did not stop within timeout/).at_least(:once)
+    end
+
+    it 'does not crash when stop times out with nil logger' do
+      allow(Signal).to receive(:trap) do |_signal, &block|
+        block&.call
+      end
+      allow(RailsCron).to receive_messages(logger: nil, stop!: false)
+
+      expect { described_class.register_signal_handlers }.not_to raise_error
+    end
   end
 
   describe 'Railtie class' do
@@ -168,12 +189,13 @@ RSpec.describe RailsCron::Railtie do
     it 'stops scheduler when running' do
       test_logger = instance_spy(Logger)
       allow(RailsCron).to receive_messages(running?: true, logger: test_logger)
-      allow(RailsCron).to receive(:stop!)
+      allow(RailsCron).to receive(:stop!).and_return(true)
 
       described_class.handle_shutdown
 
       expect(test_logger).to have_received(:info).with(/Rails is shutting down/)
       expect(RailsCron).to have_received(:stop!).with(timeout: 10)
+      expect(test_logger).not_to have_received(:warn)
     end
 
     it 'does nothing when not running' do
@@ -187,10 +209,27 @@ RSpec.describe RailsCron::Railtie do
 
     it 'does not crash when logger is nil' do
       allow(RailsCron).to receive_messages(running?: true, logger: nil)
-      allow(RailsCron).to receive(:stop!)
+      allow(RailsCron).to receive(:stop!).and_return(true)
 
       expect { described_class.handle_shutdown }.not_to raise_error
       expect(RailsCron).to have_received(:stop!).with(timeout: 10)
+    end
+
+    it 'logs warning when stop times out with logger present' do
+      test_logger = instance_spy(Logger)
+      allow(RailsCron).to receive_messages(running?: true, logger: test_logger)
+      allow(RailsCron).to receive(:stop!).and_return(false)
+
+      described_class.handle_shutdown
+
+      expect(test_logger).to have_received(:warn).with(/did not stop within timeout/)
+    end
+
+    it 'does not crash when stop times out with nil logger' do
+      allow(RailsCron).to receive_messages(running?: true, logger: nil)
+      allow(RailsCron).to receive(:stop!).and_return(false)
+
+      expect { described_class.handle_shutdown }.not_to raise_error
     end
   end
 end

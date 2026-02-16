@@ -31,7 +31,8 @@ module RailsCron
       %w[TERM INT].each do |signal|
         Signal.trap(signal) do
           logger&.info("Received #{signal} signal, stopping scheduler...")
-          RailsCron.stop!(timeout: 30)
+          stopped = RailsCron.stop!(timeout: 30)
+          logger&.warn('Scheduler did not stop within timeout, thread may still be running') unless stopped
         end
       end
     rescue StandardError => e
@@ -62,8 +63,18 @@ module RailsCron
     def self.handle_shutdown
       return unless RailsCron.running?
 
-      RailsCron.logger&.info('Rails is shutting down, stopping RailsCron scheduler...')
-      RailsCron.stop!(timeout: 10)
+      logger = RailsCron.logger
+
+      logger&.info('Rails is shutting down, stopping RailsCron scheduler...')
+      stopped = RailsCron.stop!(timeout: 10)
+      return if stopped
+
+      pid = Process.pid
+      message_array = [
+        'RailsCron scheduler did not stop within timeout.',
+        "Process #{pid} may still be running. You may need to kill it manually with `kill -9 #{pid}`."
+      ]
+      logger&.warn(message_array.join(' '))
     end
 
     ##
