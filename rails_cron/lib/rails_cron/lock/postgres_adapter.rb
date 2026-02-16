@@ -30,6 +30,8 @@ module RailsCron
     #     config.lock_adapter = RailsCron::Lock::PostgresAdapter.new(log_dispatch: true)
     #   end
     class PostgresAdapter < Adapter
+      attr_reader :log_dispatch
+
       ##
       # Initialize a new PostgreSQL adapter.
       #

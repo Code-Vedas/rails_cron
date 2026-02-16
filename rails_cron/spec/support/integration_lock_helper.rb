@@ -66,7 +66,7 @@ module IntegrationLockHelper
     thread = if lock_adapter.is_a?(RailsCron::Lock::PostgresAdapter)
                Thread.new do
                  ActiveRecord::Base.connection_pool.with_connection do
-                   RailsCron::Lock::PostgresAdapter.new.with_lock(key, ttl: ttl) { sleep hold_for }
+                   RailsCron::Lock::PostgresAdapter.new(log_dispatch: lock_adapter.log_dispatch).with_lock(key, ttl: ttl) { sleep hold_for }
                  end
                end
              else
