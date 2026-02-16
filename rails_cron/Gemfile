@@ -9,6 +9,7 @@ group :development, :test do
   gem 'danger'
   gem 'faraday-retry'
   gem 'i18n-tasks', '~> 1.0'
+  gem 'mysql2'
   gem 'pg', '~> 1.1'
   gem 'redis', '~> 5.0'
   gem 'reek'

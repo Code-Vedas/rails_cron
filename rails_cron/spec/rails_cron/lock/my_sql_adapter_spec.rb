@@ -1,0 +1,396 @@
+# frozen_string_literal: true
+
+# Copyright Codevedas Inc. 2025-present
+#
+# This source code is licensed under the MIT license found in the
+# LICENSE file in the root directory of this source tree.
+
+require 'spec_helper'
+
+RSpec.describe RailsCron::Lock::MySQLAdapter do
+  let(:mock_connection) { instance_double(ActiveRecord::ConnectionAdapters::AbstractAdapter) }
+  let(:adapter) { described_class.new }
+
+  before do
+    allow(ActiveRecord::Base).to receive(:connection).and_return(mock_connection)
+  end
+
+  describe '#initialize' do
+    it 'can be initialized without log_dispatch' do
+      adapter_default = described_class.new
+      expect(adapter_default).to be_a(described_class)
+    end
+
+    it 'can be initialized with log_dispatch true' do
+      adapter_with_log = described_class.new(log_dispatch: true)
+      expect(adapter_with_log).to be_a(described_class)
+    end
+
+    it 'can be initialized with log_dispatch false' do
+      adapter_without_log = described_class.new(log_dispatch: false)
+      expect(adapter_without_log).to be_a(described_class)
+    end
+  end
+
+  describe '#acquire' do
+    it 'returns true when lock is acquired' do
+      result_set = [{ 'GET_LOCK(?, 0)' => 1 }]
+      allow(mock_connection).to receive(:execute).and_return(result_set)
+
+      result = adapter.acquire('railscron:dispatch:job1:1234567890', 60)
+      expect(result).to be(true)
+      expect(result).to be_a(TrueClass)
+    end
+
+    it 'returns false when lock is not acquired' do
+      result_set = [{ 'GET_LOCK(?, 0)' => 0 }]
+      allow(mock_connection).to receive(:execute).and_return(result_set)
+
+      result = adapter.acquire('railscron:dispatch:job1:1234567890', 60)
+      expect(result).to be(false)
+      expect(result).to be_a(FalseClass)
+    end
+
+    it 'handles nil result from GET_LOCK (error case) as false' do
+      result_set = [{ 'GET_LOCK(?, 0)' => nil }]
+      allow(mock_connection).to receive(:execute).and_return(result_set)
+
+      result = adapter.acquire('railscron:dispatch:job1:1234567890', 60)
+      expect(result).to be(false)
+    end
+
+    it 'sends correct SQL with GET_LOCK with zero timeout' do
+      result_set = [{ 'GET_LOCK(?, 0)' => 1 }]
+      allow(mock_connection).to receive(:execute).and_return(result_set)
+      allow(ActiveRecord::Base).to receive(:sanitize_sql_array).and_call_original
+
+      adapter.acquire('test-key', 60)
+
+      expect(ActiveRecord::Base).to have_received(:sanitize_sql_array).with(
+        ['SELECT GET_LOCK(?, 0)', 'test-key']
+      )
+    end
+
+    it 'truncates lock names longer than 64 characters' do
+      long_key = 'a' * 100
+      result_set = [{ 'GET_LOCK(?, 0)' => 1 }]
+      allow(mock_connection).to receive(:execute).and_return(result_set)
+      allow(Rails.logger).to receive(:warn)
+
+      adapter.acquire(long_key, 60)
+
+      expect(Rails.logger).to have_received(:warn)
+    end
+
+    it 'raises LockAdapterError on database failure' do
+      allow(mock_connection).to receive(:execute).and_raise(StandardError, 'Connection lost')
+
+      expect do
+        adapter.acquire('lock-key', 60)
+      end.to raise_error(RailsCron::Lock::LockAdapterError, /MySQL acquire failed/)
+    end
+
+    context 'with log_dispatch enabled' do
+      let(:adapter) { described_class.new(log_dispatch: true) }
+
+      it 'attempts to log dispatch when lock is acquired' do
+        result_set = [{ 'GET_LOCK(?, 0)' => 1 }]
+        allow(mock_connection).to receive(:execute).and_return(result_set)
+
+        expect { adapter.acquire('railscron:dispatch:myjob:1609459200', 60) }.not_to raise_error
+      end
+
+      it 'raises LockAdapterError if CronDispatch.create! fails' do
+        result_set = [{ 'GET_LOCK(?, 0)' => 1 }]
+        allow(mock_connection).to receive(:execute).and_return(result_set)
+        allow(RailsCron::CronDispatch).to receive(:create!).and_raise(StandardError, 'DB error')
+
+        expect do
+          adapter.acquire('railscron:dispatch:job:1234567890', 60)
+        end.to raise_error(RailsCron::Lock::LockAdapterError, /Failed to log dispatch/)
+      end
+    end
+
+    context 'with log_dispatch disabled' do
+      let(:adapter) { described_class.new(log_dispatch: false) }
+
+      it 'does not attempt to log dispatch' do
+        result_set = [{ 'GET_LOCK(?, 0)' => 1 }]
+        allow(mock_connection).to receive(:execute).and_return(result_set)
+
+        expect { adapter.acquire('lock-key', 60) }.not_to raise_error
+      end
+    end
+  end
+
+  describe '#release' do
+    it 'returns true when lock is released' do
+      result_set = [{ 'RELEASE_LOCK(?)' => 1 }]
+      allow(mock_connection).to receive(:execute).and_return(result_set)
+
+      result = adapter.release('lock-key')
+      expect(result).to be(true)
+      expect(result).to be_a(TrueClass)
+    end
+
+    it 'returns false when lock was not held' do
+      result_set = [{ 'RELEASE_LOCK(?)' => 0 }]
+      allow(mock_connection).to receive(:execute).and_return(result_set)
+
+      result = adapter.release('lock-key')
+      expect(result).to be(false)
+      expect(result).to be_a(FalseClass)
+    end
+
+    it 'handles nil result from RELEASE_LOCK (error case) as false' do
+      result_set = [{ 'RELEASE_LOCK(?)' => nil }]
+      allow(mock_connection).to receive(:execute).and_return(result_set)
+
+      result = adapter.release('lock-key')
+      expect(result).to be(false)
+    end
+
+    it 'sends correct SQL with RELEASE_LOCK' do
+      result_set = [{ 'RELEASE_LOCK(?)' => 1 }]
+      allow(mock_connection).to receive(:execute).and_return(result_set)
+      allow(ActiveRecord::Base).to receive(:sanitize_sql_array).and_call_original
+
+      adapter.release('test-key')
+
+      expect(ActiveRecord::Base).to have_received(:sanitize_sql_array).with(
+        ['SELECT RELEASE_LOCK(?)', 'test-key']
+      )
+    end
+
+    it 'truncates lock names longer than 64 characters' do
+      long_key = 'b' * 100
+      result_set = [{ 'RELEASE_LOCK(?)' => 1 }]
+      allow(mock_connection).to receive(:execute).and_return(result_set)
+      allow(Rails.logger).to receive(:warn)
+
+      adapter.release(long_key)
+
+      expect(Rails.logger).to have_received(:warn)
+    end
+
+    it 'raises LockAdapterError on database failure' do
+      allow(mock_connection).to receive(:execute).and_raise(
+        ActiveRecord::StatementInvalid, 'Connection lost'
+      )
+
+      expect do
+        adapter.release('lock-key')
+      end.to raise_error(RailsCron::Lock::LockAdapterError, /MySQL release failed/)
+    end
+  end
+
+  describe '#with_lock' do
+    before do
+      result_set = [{ 'GET_LOCK(?, 0)' => 1 }]
+      allow(mock_connection).to receive(:execute).and_return(result_set)
+    end
+
+    it 'executes block and returns result when lock is acquired' do
+      result = adapter.with_lock('lock-key', ttl: 60) { 42 }
+      expect(result).to eq(42)
+    end
+
+    it 'returns nil when lock cannot be acquired' do
+      result_set = [{ 'GET_LOCK(?, 0)' => 0 }]
+      allow(mock_connection).to receive(:execute).and_return(result_set)
+
+      result = adapter.with_lock('lock-key', ttl: 60) { 42 }
+      expect(result).to be_nil
+    end
+
+    it 'releases lock after successful block execution' do
+      call_count = 0
+      allow(mock_connection).to receive(:execute) do
+        call_count += 1
+        if call_count == 1
+          [{ 'GET_LOCK(?, 0)' => 1 }]
+        else
+          [{ 'RELEASE_LOCK(?)' => 1 }]
+        end
+      end
+
+      adapter.with_lock('lock-key', ttl: 60) { true }
+
+      expect(call_count).to be >= 2
+    end
+
+    it 'releases lock even if block raises exception' do
+      result_set_acquire = [{ 'GET_LOCK(?, 0)' => 1 }]
+      result_set_release = [{ 'RELEASE_LOCK(?)' => 1 }]
+
+      call_count = 0
+      allow(mock_connection).to receive(:execute) do
+        call_count += 1
+        call_count == 1 ? result_set_acquire : result_set_release
+      end
+
+      expect do
+        adapter.with_lock('lock-key', ttl: 60) { raise 'test error' }
+      end.to raise_error('test error')
+
+      expect(call_count).to be >= 2
+    end
+  end
+
+  describe 'lock key parsing' do
+    it 'parses simple lock keys correctly' do
+      result_set = [{ 'lock_acquired' => 1 }]
+      allow(mock_connection).to receive(:execute).and_return(result_set)
+
+      # Should not raise
+      expect { adapter.acquire('railscron:dispatch:simple-job:1609459200', 60) }.not_to raise_error
+    end
+
+    it 'parses lock keys with colons in the job name' do
+      result_set = [{ 'lock_acquired' => 1 }]
+      allow(mock_connection).to receive(:execute).and_return(result_set)
+
+      # Job name contains colons (e.g., "job:subname:action")
+      expect { adapter.acquire('railscron:dispatch:job:subname:action:1609459200', 60) }.not_to raise_error
+    end
+  end
+
+  describe 'lock name length limit' do
+    it 'allows lock names up to 64 characters' do
+      key = 'a' * 64
+      result_set = [{ 'GET_LOCK(?, 0)' => 1 }]
+      allow(mock_connection).to receive(:execute).and_return(result_set)
+
+      expect do
+        adapter.acquire(key, 60)
+      end.not_to raise_error
+    end
+
+    it 'truncates and warns for lock names exceeding 64 characters' do
+      key = 'a' * 65
+      result_set = [{ 'GET_LOCK(?, 0)' => 1 }]
+      allow(mock_connection).to receive(:execute).and_return(result_set)
+      allow(Rails.logger).to receive(:warn)
+
+      adapter.acquire(key, 60)
+
+      expect(Rails.logger).to have_received(:warn) do |message|
+        expect(message).to include('Lock key')
+        expect(message).to include('exceeds MySQL named lock limit')
+        expect(message).to include('64')
+      end
+    end
+  end
+
+  describe 'cast_to_boolean coverage' do
+    it 'handles true boolean value directly' do
+      result_set = [{ 'GET_LOCK(?, 0)' => true }]
+      allow(mock_connection).to receive(:execute).and_return(result_set)
+
+      result = adapter.acquire('test-key', 60)
+      expect(result).to be(true)
+    end
+
+    it 'handles false boolean value directly' do
+      result_set = [{ 'GET_LOCK(?, 0)' => false }]
+      allow(mock_connection).to receive(:execute).and_return(result_set)
+
+      result = adapter.acquire('test-key', 60)
+      expect(result).to be(false)
+    end
+
+    it 'handles string "t" via regex fallback' do
+      result_set = [{ 'GET_LOCK(?, 0)' => 't' }]
+      allow(mock_connection).to receive(:execute).and_return(result_set)
+
+      result = adapter.acquire('test-key', 60)
+      expect(result).to be(true)
+    end
+
+    it 'handles string "f" via regex fallback' do
+      result_set = [{ 'GET_LOCK(?, 0)' => 'f' }]
+      allow(mock_connection).to receive(:execute).and_return(result_set)
+
+      result = adapter.acquire('test-key', 60)
+      expect(result).to be(false)
+    end
+
+    it 'handles string "false" via regex fallback' do
+      result_set = [{ 'GET_LOCK(?, 0)' => 'false' }]
+      allow(mock_connection).to receive(:execute).and_return(result_set)
+
+      result = adapter.acquire('test-key', 60)
+      expect(result).to be(false)
+    end
+
+    it 'handles string "0" via regex fallback' do
+      result_set = [{ 'GET_LOCK(?, 0)' => '0' }]
+      allow(mock_connection).to receive(:execute).and_return(result_set)
+
+      result = adapter.acquire('test-key', 60)
+      expect(result).to be(false)
+    end
+
+    it 'handles string "1" via regex fallback as truthy' do
+      result_set = [{ 'GET_LOCK(?, 0)' => '1' }]
+      allow(mock_connection).to receive(:execute).and_return(result_set)
+
+      result = adapter.acquire('test-key', 60)
+      expect(result).to be(true)
+    end
+
+    it 'handles empty string via regex fallback as false' do
+      result_set = [{ 'GET_LOCK(?, 0)' => '' }]
+      allow(mock_connection).to receive(:execute).and_return(result_set)
+
+      result = adapter.acquire('test-key', 60)
+      expect(result).to be(false)
+    end
+
+    it 'handles arbitrary string via regex fallback as true' do
+      result_set = [{ 'GET_LOCK(?, 0)' => 'yes' }]
+      allow(mock_connection).to receive(:execute).and_return(result_set)
+
+      result = adapter.acquire('test-key', 60)
+      expect(result).to be(true)
+    end
+  end
+
+  describe 'result row format handling' do
+    it 'handles array result row format in acquire (non-hash format)' do
+      # Some MySQL adapters may return arrays instead of hashes
+      result_set = [[1]]
+      allow(mock_connection).to receive(:execute).and_return(result_set)
+
+      result = adapter.acquire('test-key', 60)
+      expect(result).to be(true)
+    end
+
+    it 'handles array result row format in release (non-hash format)' do
+      # Some MySQL adapters may return arrays instead of hashes
+      result_set = [[1]]
+      allow(mock_connection).to receive(:execute).and_return(result_set)
+
+      result = adapter.release('test-key')
+      expect(result).to be(true)
+    end
+
+    it 'handles nil result row in acquire with safe navigation' do
+      # Empty result set
+      result_set = []
+      allow(mock_connection).to receive(:execute).and_return(result_set)
+
+      result = adapter.acquire('test-key', 60)
+      expect(result).to be(false)
+    end
+
+    it 'handles nil result row in release with safe navigation' do
+      # Empty result set
+      result_set = []
+      allow(mock_connection).to receive(:execute).and_return(result_set)
+
+      result = adapter.release('test-key')
+      expect(result).to be(false)
+    end
+  end
+end
