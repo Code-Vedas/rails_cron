@@ -2,13 +2,6 @@
 
 require 'spec_helper'
 
-def kw_enqueue(&block)
-  lambda do |fire_time:, idempotency_key:|
-    block&.call(fire_time, idempotency_key)
-    idempotency_key
-  end
-end
-
 RSpec.describe RailsCron::Coordinator do
   subject(:coordinator) { described_class.new(configuration: configuration, registry: registry) }
 
@@ -23,6 +16,14 @@ RSpec.describe RailsCron::Coordinator do
     end
   end
   let(:registry) { RailsCron::Registry.new }
+
+  # Helper method to create an enqueue proc that accepts keyword arguments
+  def kw_enqueue(&block)
+    lambda do |fire_time:, idempotency_key:|
+      block&.call(fire_time, idempotency_key)
+      idempotency_key
+    end
+  end
 
   after { coordinator.stop! if coordinator.running? }
 
