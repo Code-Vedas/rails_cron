@@ -12,6 +12,7 @@ require 'rails_cron/lock/adapter'
 require 'rails_cron/lock/memory_adapter'
 require 'rails_cron/lock/redis_adapter'
 require 'rails_cron/lock/postgres_adapter'
+require 'rails_cron/lock/sqlite_adapter'
 require 'rails_cron/coordinator'
 require 'rails_cron/railtie'
 
