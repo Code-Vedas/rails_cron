@@ -57,6 +57,34 @@ module RailsCron
       def release(_key)
         raise NotImplementedError, 'Subclasses must implement #release'
       end
+
+      ##
+      # Acquire a lock, execute the block, then release the lock.
+      #
+      # This is a convenience method that ensures the lock is properly released
+      # even if the block raises an exception. If the lock cannot be acquired,
+      # returns nil without executing the block.
+      #
+      # @param key [String] the lock key
+      # @param ttl [Integer] time-to-live in seconds
+      # @yield executes the block if lock is acquired
+      # @return [Object] the result of the block if executed, nil if lock not acquired
+      #
+      # @example
+      #   result = adapter.with_lock("railscron:job1:1234567890", ttl: 60) do
+      #     # Do protected work
+      #     42
+      #   end
+      #   # result is 42 if lock acquired, nil otherwise
+      def with_lock(key, ttl:)
+        return nil unless acquire(key, ttl)
+
+        begin
+          yield
+        ensure
+          release(key)
+        end
+      end
     end
 
     ##
@@ -88,6 +116,17 @@ module RailsCron
       # @return [Boolean] always true
       def release(_key) # rubocop:disable Naming/PredicateMethod
         true
+      end
+
+      ##
+      # Execute the block without any actual locking (always succeeds).
+      #
+      # @param key [String] unused
+      # @param ttl [Integer] unused
+      # @yield executes the block immediately
+      # @return [Object] the result of the block
+      def with_lock(*)
+        yield
       end
     end
   end

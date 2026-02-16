@@ -43,6 +43,9 @@ detectors:
     enabled: true
     exclude:
       - RailsCron::Registry#callable?
+      - RailsCron::Lock::PostgresAdapter#calculate_lock_id
+      - RailsCron::Lock::PostgresAdapter#parse_lock_key
+      - RailsCron::Lock::RedisAdapter#generate_lock_value
   FeatureEnvy:
     enabled: true
     exclude:

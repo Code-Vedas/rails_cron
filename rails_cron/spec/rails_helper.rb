@@ -36,6 +36,10 @@ RSpec.configure do |config|
   config.use_transactional_fixtures = false
   config.fixture_paths = [Rails.root.join('spec/fixtures')]
   config.filter_rails_from_backtrace!
+
+  config.before do
+    RailsCron::CronDispatch.delete_all
+  end
 end
 
 Shoulda::Matchers.configure do |config|

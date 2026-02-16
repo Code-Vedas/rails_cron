@@ -277,7 +277,7 @@ module RailsCron
 
     def generate_lock_key(cron_key, fire_time)
       namespace = @configuration.namespace || 'railscron'
-      "#{namespace}-dispatch-lock-#{cron_key}-#{fire_time.to_i}"
+      "#{namespace}:dispatch:#{cron_key}:#{fire_time.to_i}"
     end
 
     def sleep_until_next_tick

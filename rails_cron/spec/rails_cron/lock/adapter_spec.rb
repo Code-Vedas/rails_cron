@@ -24,6 +24,14 @@ RSpec.describe RailsCron::Lock::Adapter do
       expect { adapter.release('test-key') }.to raise_error(NotImplementedError, /must implement #release/)
     end
   end
+
+  describe '#with_lock' do
+    it 'raises NotImplementedError when called directly on base class' do
+      adapter = described_class.new
+
+      expect { adapter.with_lock('test-key', ttl: 60) { 42 } }.to raise_error(NotImplementedError)
+    end
+  end
 end
 
 RSpec.describe RailsCron::Lock::NullAdapter do
@@ -48,6 +56,24 @@ RSpec.describe RailsCron::Lock::NullAdapter do
     it 'returns true regardless of key' do
       expect(adapter.release('any-key')).to be(true)
       expect(adapter.release('another-key')).to be(true)
+    end
+  end
+
+  describe '#with_lock' do
+    it 'executes the block and returns its result' do
+      result = adapter.with_lock('test-key', ttl: 60) { 42 }
+      expect(result).to eq(42)
+    end
+
+    it 'always executes the block (no actual locking)' do
+      called = false
+      adapter.with_lock('test-key', ttl: 60) { called = true }
+      expect(called).to be(true)
+    end
+
+    it 'executes the block and returns complex results' do
+      result = adapter.with_lock('test-key', ttl: 60) { { status: 'ok', data: [1, 2, 3] } }
+      expect(result).to eq({ status: 'ok', data: [1, 2, 3] })
     end
   end
 end
