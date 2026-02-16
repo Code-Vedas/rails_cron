@@ -24,7 +24,7 @@ env:
   APP_DIR: ${{ github.workspace }}/rails_cron
   BUNDLE_GEMFILE: ${{ inputs.bundle_gemfile != '' && format('{0}/{1}', github.workspace, inputs.bundle_gemfile) || '' }}
 jobs:
-  teste2e:
+  test_e2e:
     permissions:
       contents: read
     runs-on: ubuntu-latest
