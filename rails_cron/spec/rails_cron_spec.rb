@@ -15,6 +15,7 @@ RSpec.describe RailsCron do
   before do
     described_class.reset_configuration!
     described_class.reset_registry!
+    described_class.reset_coordinator!
   end
 
   describe '.configuration' do
