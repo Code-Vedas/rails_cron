@@ -124,6 +124,26 @@ RSpec.describe RailsCron::Coordinator do
       coordinator.reset!
       expect(coordinator.running?).to be false
     end
+
+    it 'resets state when coordinator is not running' do
+      coordinator.instance_variable_set(:@stop_requested, true)
+      coordinator.instance_variable_set(:@running, false)
+
+      coordinator.reset!
+
+      expect(coordinator.send(:stop_requested?)).to be false
+      expect(coordinator.running?).to be false
+    end
+
+    it 'raises error when stop! times out on running coordinator' do
+      thread = instance_double(Thread, 'abort_on_exception=': nil)
+      allow(thread).to receive(:join).with(30).and_return(nil)
+
+      coordinator.instance_variable_set(:@running, true)
+      coordinator.instance_variable_set(:@thread, thread)
+
+      expect { coordinator.reset! }.to raise_error(RuntimeError, /Failed to stop coordinator/)
+    end
   end
 
   describe '#tick!' do

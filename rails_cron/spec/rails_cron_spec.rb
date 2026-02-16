@@ -231,13 +231,41 @@ RSpec.describe RailsCron do
       expect(new_coordinator).to be_a(RailsCron::Coordinator)
     end
 
-    it 'calls reset! on the existing coordinator' do
+    it 'stops a running coordinator before resetting' do
       coordinator = described_class.coordinator
-      allow(coordinator).to receive(:reset!)
+      coordinator.start!
 
-      described_class.reset_coordinator!
+      expect(coordinator.running?).to be true
 
-      expect(coordinator).to have_received(:reset!)
+      new_coordinator = described_class.reset_coordinator!
+
+      expect(coordinator.running?).to be false
+      expect(new_coordinator).not_to eq(coordinator)
+    end
+
+    it 'does not error when coordinator is not running' do
+      coordinator = described_class.coordinator
+      expect(coordinator.running?).to be false
+
+      expect { described_class.reset_coordinator! }.not_to raise_error
+    end
+
+    it 'handles nil coordinator gracefully' do
+      # Ensure @coordinator is nil without calling coordinator method
+      described_class.instance_variable_set(:@coordinator, nil)
+
+      expect { described_class.reset_coordinator! }.not_to raise_error
+      expect(described_class.coordinator).to be_a(RailsCron::Coordinator)
+    end
+
+    it 'raises error when stop! times out' do
+      coordinator = described_class.coordinator
+      coordinator.start!
+
+      # Stub stop! to return false (timeout)
+      allow(coordinator).to receive(:stop!).and_return(false)
+
+      expect { described_class.reset_coordinator! }.to raise_error(RuntimeError, /Failed to stop coordinator/)
     end
   end
 

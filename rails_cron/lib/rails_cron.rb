@@ -75,9 +75,18 @@ module RailsCron
     ##
     # Reset coordinator to initial state. Primarily used in tests.
     #
+    # Stops any running coordinator and creates a fresh instance.
+    #
     # @return [Coordinator] a fresh coordinator object
+    # @raise [RuntimeError] if the running coordinator cannot be stopped within timeout
     def reset_coordinator!
-      coordinator.reset!
+      # Stop the existing coordinator if it's running
+      if @coordinator&.running?
+        stopped = @coordinator.stop!
+        raise 'Failed to stop coordinator thread within timeout' unless stopped
+      end
+
+      # Create and return a fresh coordinator
       @coordinator = nil
       coordinator
     end
