@@ -73,7 +73,7 @@ module RailsCron
       # @param ttl [Integer] time-to-live in seconds (ignored; see class docs)
       # @return [Boolean] true if acquired, false if held by another process
       def acquire(key, _ttl)
-        lock_name = truncate_lock_name(key)
+        lock_name = normalize_lock_name(key)
 
         # GET_LOCK returns 1 on success, 0 on timeout, NULL on error
         sql = ActiveRecord::Base.sanitize_sql_array(['SELECT GET_LOCK(?, 0) as lock_result', lock_name])
@@ -96,7 +96,7 @@ module RailsCron
       # @param key [String] the lock key
       # @return [Boolean] true if released, false if not held
       def release(key)
-        lock_name = truncate_lock_name(key)
+        lock_name = normalize_lock_name(key)
 
         # RELEASE_LOCK returns 1 if held and released, 0 if not held, NULL on error
         sql = ActiveRecord::Base.sanitize_sql_array(['SELECT RELEASE_LOCK(?) as lock_result', lock_name])
@@ -150,11 +150,6 @@ module RailsCron
         )
 
         normalized
-      end
-
-      def truncate_lock_name(key)
-        # Alias for backward compatibility and clarity in acquire/release calls
-        normalize_lock_name(key)
       end
 
       def log_dispatch_attempt(key)

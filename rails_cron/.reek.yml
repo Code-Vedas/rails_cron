@@ -51,7 +51,6 @@ detectors:
       - RailsCron::Lock::RedisAdapter#generate_lock_value
       - RailsCron::Lock::MySQLAdapter#cast_to_boolean
       - RailsCron::Lock::MySQLAdapter#parse_lock_key
-      - RailsCron::Lock::MySQLAdapter#truncate_lock_name
       - RailsCron::Lock::MySQLAdapter#normalize_lock_name
   FeatureEnvy:
     enabled: true
