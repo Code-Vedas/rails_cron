@@ -25,7 +25,11 @@ module RailsCron
       namespace: 'railscron',
       lock_adapter: nil,
       logger: nil,
-      time_zone: nil
+      time_zone: nil,
+      enable_log_dispatch_registry: false,
+      enable_dispatch_recovery: true,
+      recovery_window: 86_400, # 24 hours in seconds
+      recovery_startup_jitter: 5 # max random delay in seconds
     }.freeze
 
     ##
@@ -92,7 +96,8 @@ module RailsCron
         namespace: @values[:namespace],
         lock_adapter: lock_adapter&.class&.name,
         logger: logger&.class&.name,
-        time_zone: @values[:time_zone]
+        time_zone: @values[:time_zone],
+        enable_log_dispatch_registry: @values[:enable_log_dispatch_registry]
       }
     end
 
@@ -180,6 +185,8 @@ module RailsCron
         value.to_s
       when :time_zone
         value&.to_s
+      when :enable_log_dispatch_registry
+        value ? true : false
       else
         value
       end

@@ -6,6 +6,7 @@
 # LICENSE file in the root directory of this source tree.
 
 require 'securerandom'
+require_relative 'dispatch_logging'
 
 module RailsCron
   module Lock
@@ -23,24 +24,37 @@ module RailsCron
     #   redis = Redis.new(url: ENV["REDIS_URL"])
     #   RailsCron.configure do |config|
     #     config.lock_adapter = RailsCron::Lock::RedisAdapter.new(redis)
+    #     config.enable_log_dispatch_registry = true  # Enable dispatch logging
     #   end
     class RedisAdapter < Adapter
+      include DispatchLogging
+
       ##
       # Initialize a new Redis adapter.
       #
       # @param redis [Object] a Redis-compatible client instance
+      # @param namespace [String] namespace prefix for dispatch registry keys
       # @raise [ArgumentError] if redis is not provided or does not implement the required interface
-      def initialize(redis)
+      def initialize(redis, namespace: 'railscron')
         super()
         raise ArgumentError, 'redis client is required' if redis.nil?
         raise ArgumentError, 'redis client must respond to :set and :eval' unless redis.respond_to?(:set) && redis.respond_to?(:eval)
 
         @redis = redis
+        @namespace = namespace
         # Store lock values with expiration timestamps to enable safe release and prevent unbounded memory growth.
         # Since lock keys include fire_time.to_i, each dispatch creates a unique key. In the coordinator's
         # normal flow, release is never called (TTL is relied upon), so we must expire local entries.
         @lock_values = {}
         @mutex = Mutex.new
+      end
+
+      ##
+      # Get the dispatch registry for Redis logging.
+      #
+      # @return [RailsCron::Dispatch::RedisEngine] Redis engine instance
+      def dispatch_registry
+        @dispatch_registry ||= RailsCron::Dispatch::RedisEngine.new(@redis, namespace: @namespace)
       end
 
       ##
@@ -67,7 +81,10 @@ module RailsCron
           end
         end
 
-        result.present?
+        acquired = result.present?
+        log_dispatch_attempt(key) if acquired
+
+        acquired
       rescue StandardError => e
         raise LockAdapterError, "Redis acquire failed for #{key}: #{e.message}"
       end

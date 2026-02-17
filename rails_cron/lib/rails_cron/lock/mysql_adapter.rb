@@ -31,17 +31,13 @@ module RailsCron
     # - Ensure connection pooling is properly configured to release connections
     #   promptly when processes terminate.
     #
-    # Optionally logs all dispatch attempts to the CronDispatch model for
-    # audit/observability purposes.
+    # Optionally logs all dispatch attempts to the database when
+    # enable_log_dispatch_registry is enabled in configuration.
     #
     # @example Using the MySQL adapter
     #   RailsCron.configure do |config|
     #     config.lock_adapter = RailsCron::Lock::MySQLAdapter.new
-    #   end
-    #
-    # @example With audit logging
-    #   RailsCron.configure do |config|
-    #     config.lock_adapter = RailsCron::Lock::MySQLAdapter.new(log_dispatch: true)
+    #     config.enable_log_dispatch_registry = true  # Enable dispatch logging
     #   end
     class MySQLAdapter < Adapter
       include DispatchLogging
@@ -49,23 +45,23 @@ module RailsCron
       # MySQL named locks have a maximum length of 64 characters
       MAX_LOCK_NAME_LENGTH = 64
 
-      attr_reader :log_dispatch
-
       ##
       # Initialize a new MySQL adapter.
+
+      ##
+      # Get the dispatch registry for database logging.
       #
-      # @param log_dispatch [Boolean] whether to log dispatch attempts to CronDispatch model (default: false)
-      def initialize(log_dispatch: false)
-        super()
-        @log_dispatch = log_dispatch
+      # @return [RailsCron::Dispatch::DatabaseEngine] database engine instance
+      def dispatch_registry
+        @dispatch_registry ||= RailsCron::Dispatch::DatabaseEngine.new
       end
 
       ##
       # Attempt to acquire a distributed lock using MySQL GET_LOCK.
       #
       # Uses MySQL's GET_LOCK(name, timeout) function with a timeout of 0 seconds
-      # to perform non-blocking acquisition. If successful, records the dispatch
-      # attempt if log_dispatch is enabled.
+      # to perform non-blocking acquisition. If successful, logs the dispatch
+      # attempt when enable_log_dispatch_registry is enabled.
       #
       # **Note:** The +ttl+ parameter is ignored. MySQL named locks are connection-based
       # and do not have automatic expiration. The lock will be held until explicitly
@@ -86,7 +82,7 @@ module RailsCron
         result_value = result_row.is_a?(Hash) ? result_row['lock_result'] : result_row&.first
         acquired = cast_to_boolean(result_value)
 
-        log_dispatch_attempt(key) if acquired && @log_dispatch
+        log_dispatch_attempt(key) if acquired
 
         acquired
       rescue StandardError => e

@@ -53,6 +53,9 @@ module RailsCron
       @mutex.synchronize do
         return nil if @running
 
+        # Run recovery before starting the main loop
+        recover_missed_runs
+
         @running = true
         @stop_requested = false
         @thread = Thread.new { run_loop }
@@ -243,6 +246,112 @@ module RailsCron
     rescue StandardError => e
       cron_key ||= 'unknown'
       logger&.error("Error dispatching work for #{cron_key}: #{e.message}")
+    end
+
+    ##
+    # Recover missed cron runs after downtime.
+    #
+    # Looks back over the recovery window to find cron jobs that should have executed
+    # but were missed due to downtime. Uses the dispatch log (if enabled) to skip
+    # already-dispatched jobs, and relies on locks for duplicate prevention.
+    #
+    # @return [void]
+    def recover_missed_runs
+      return unless @configuration.enable_dispatch_recovery
+
+      # Add random jitter to reduce lock contention when multiple nodes restart simultaneously
+      jitter = rand(0..@configuration.recovery_startup_jitter)
+      sleep(jitter) if jitter.positive?
+
+      current_time = Time.current
+      recovery_window = @configuration.recovery_window
+      recovery_start = current_time - recovery_window
+      recovery_end = current_time
+
+      logger = @configuration.logger
+      logger&.info("Starting missed-run recovery for window: #{recovery_start} to #{recovery_end}")
+
+      total_recovered = 0
+      @registry.each do |entry|
+        recovered = recover_entry(entry, recovery_start, recovery_end)
+        total_recovered += recovered
+      end
+
+      logger&.info("Missed-run recovery completed: attempted #{total_recovered} dispatches")
+
+      # Clean up old dispatch records after recovery completes
+      cleanup_old_dispatch_records(recovery_window)
+    rescue StandardError => e
+      logger&.error("Error during missed-run recovery: #{e.message}")
+    end
+
+    ##
+    # Recover missed runs for a single cron entry.
+    #
+    # @param entry [RailsCron::Registry::Entry] the cron job entry
+    # @param start_time [Time] the start of the recovery window
+    # @param end_time [Time] the end of the recovery window
+    # @return [Integer] number of occurrences attempted to dispatch
+    def recover_entry(entry, start_time, end_time)
+      logger = @configuration.logger
+      entry_key = entry.key
+      cron = parse_cron(entry.cron)
+      return 0 unless cron
+
+      occurrences = find_occurrences(cron, start_time, end_time)
+
+      # Filter out already-dispatched runs if dispatch logging is enabled
+      occurrences.reject! { |fire_time| already_dispatched?(entry_key, fire_time) } if @configuration.enable_log_dispatch_registry
+      occurrences_size = occurrences.size
+      logger&.info("Recovering #{occurrences_size} missed runs for #{entry_key}")
+
+      # Attempt to dispatch each missed occurrence
+      occurrences.each do |fire_time|
+        dispatch_if_due(entry, fire_time, Time.current)
+      end
+
+      occurrences_size
+    rescue StandardError => e
+      logger&.error("Error recovering entry #{entry_key}: #{e.message}")
+      0
+    end
+
+    ##
+    # Clean up old dispatch records to prevent database bloat.
+    #
+    # Called after recovery completes. Deletes dispatch records older than
+    # the recovery window, since they are no longer needed for future recovery.
+    #
+    # @param recovery_window [Integer] seconds - records older than this are deleted
+    # @return [void]
+    def cleanup_old_dispatch_records(recovery_window)
+      logger = @configuration.logger
+      adapter = @configuration.lock_adapter
+      return if adapter.nil? || !adapter.respond_to?(:dispatch_registry)
+
+      registry = adapter.dispatch_registry
+      return unless registry.respond_to?(:cleanup)
+
+      deleted_count = registry.cleanup(recovery_window: recovery_window)
+      logger&.debug("Cleaned up #{deleted_count} old dispatch records") if deleted_count.positive?
+    rescue StandardError => e
+      logger&.warn("Error cleaning up old dispatch records: #{e.message}")
+    end
+
+    ##
+    # Check if a cron job was already dispatched.
+    #
+    # @param key [String] the cron job key
+    # @param fire_time [Time] the fire time to check
+    # @return [Boolean] true if already dispatched, false otherwise
+    def already_dispatched?(key, fire_time)
+      adapter = @configuration.lock_adapter
+      return false if adapter.nil? || !adapter.respond_to?(:dispatch_registry)
+
+      adapter.dispatch_registry.dispatched?(key, fire_time)
+    rescue StandardError => e
+      @configuration.logger&.warn("Error checking dispatch status for #{key}: #{e.message}")
+      false
     end
 
     def acquire_lock(lock_key)
