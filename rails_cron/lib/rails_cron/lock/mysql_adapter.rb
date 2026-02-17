@@ -7,6 +7,7 @@
 
 require 'socket'
 require 'digest'
+require_relative 'dispatch_logging'
 
 module RailsCron
   module Lock
@@ -43,6 +44,8 @@ module RailsCron
     #     config.lock_adapter = RailsCron::Lock::MySQLAdapter.new(log_dispatch: true)
     #   end
     class MySQLAdapter < Adapter
+      include DispatchLogging
+
       # MySQL named locks have a maximum length of 64 characters
       MAX_LOCK_NAME_LENGTH = 64
 
@@ -150,33 +153,6 @@ module RailsCron
         )
 
         normalized
-      end
-
-      def log_dispatch_attempt(key)
-        cron_key, fire_time = parse_lock_key(key)
-        node_id = Socket.gethostname
-
-        ::RailsCron::CronDispatch.create!(
-          key: cron_key,
-          fire_time: fire_time,
-          dispatched_at: Time.current,
-          node_id: node_id,
-          status: 'dispatched'
-        )
-      rescue StandardError => e
-        raise LockAdapterError, "Failed to log dispatch for #{key}: #{e.message}"
-      end
-
-      def parse_lock_key(key)
-        # Lock key format: "namespace:dispatch:cron_key:fire_time"
-        # Parse by splitting on colon: remove namespace, "dispatch", then rejoin remaining parts as key
-        parts = key.split(':')
-        fire_time_unix = parts.pop.to_i
-        2.times { parts.shift } # Remove namespace and "dispatch"
-        cron_key = parts.join(':')
-        fire_time = Time.at(fire_time_unix)
-
-        [cron_key, fire_time]
       end
     end
   end
