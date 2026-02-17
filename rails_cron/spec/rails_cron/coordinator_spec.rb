@@ -18,6 +18,7 @@ RSpec.describe RailsCron::Coordinator do
       config.window_lookback = 10
       config.window_lookahead = 0
       config.namespace = 'railscron'
+      config.enable_dispatch_recovery = false # Disable recovery by default in tests for performance
     end
   end
   let(:registry) { RailsCron::Registry.new }
@@ -1196,4 +1197,507 @@ RSpec.describe RailsCron::Coordinator do
       expect(logger).to have_received(:error).with(/Error dispatching work/)
     end
   end
+
+  # rubocop:disable RSpec/SubjectStub
+  describe '#recover_missed_runs' do
+    it 'skips recovery when enable_dispatch_recovery is false' do
+      configuration.enable_dispatch_recovery = false
+      allow(coordinator).to receive(:recover_entry)
+
+      coordinator.send(:recover_missed_runs)
+
+      expect(coordinator).not_to have_received(:recover_entry)
+    end
+
+    it 'performs recovery when enable_dispatch_recovery is true' do
+      configuration.enable_dispatch_recovery = true
+      configuration.recovery_startup_jitter = 0
+      registry.add(key: 'job1', cron: '* * * * *', enqueue: kw_enqueue)
+      allow(coordinator).to receive(:recover_entry).and_return(0)
+
+      coordinator.send(:recover_missed_runs)
+
+      expect(coordinator).to have_received(:recover_entry).once
+    end
+
+    it 'sleeps for random jitter before recovery' do
+      configuration.enable_dispatch_recovery = true
+      configuration.recovery_startup_jitter = 5
+      allow(coordinator).to receive_messages(sleep: nil, rand: 3, recover_entry: 0)
+
+      coordinator.send(:recover_missed_runs)
+
+      expect(coordinator).to have_received(:sleep).with(3)
+    end
+
+    it 'skips sleep when jitter is zero' do
+      configuration.enable_dispatch_recovery = true
+      configuration.recovery_startup_jitter = 0
+      allow(coordinator).to receive(:sleep)
+      allow(coordinator).to receive(:recover_entry).and_return(0)
+
+      coordinator.send(:recover_missed_runs)
+
+      expect(coordinator).not_to have_received(:sleep)
+    end
+
+    it 'computes correct recovery window based on configuration' do
+      configuration.enable_dispatch_recovery = true
+      configuration.recovery_window = 3600
+      configuration.recovery_startup_jitter = 0 # Disable jitter for timing test
+      registry.add(key: 'job1', cron: '* * * * *', enqueue: kw_enqueue)
+
+      expected_start = Time.current - 3600
+      expected_end = Time.current
+
+      allow(coordinator).to receive(:recover_entry) do |_entry, start_time, end_time|
+        expect(start_time).to be_within(2).of(expected_start)
+        expect(end_time).to be_within(2).of(expected_end)
+        0
+      end
+
+      coordinator.send(:recover_missed_runs)
+
+      expect(coordinator).to have_received(:recover_entry)
+    end
+
+    it 'calls recover_entry for each registered job' do
+      configuration.enable_dispatch_recovery = true
+      configuration.recovery_startup_jitter = 0
+      registry.add(key: 'job1', cron: '* * * * *', enqueue: kw_enqueue)
+      registry.add(key: 'job2', cron: '0 * * * *', enqueue: kw_enqueue)
+      allow(coordinator).to receive(:recover_entry).and_return(0)
+
+      coordinator.send(:recover_missed_runs)
+
+      expect(coordinator).to have_received(:recover_entry).twice
+    end
+
+    it 'logs recovery start with window information' do
+      configuration.enable_dispatch_recovery = true
+      configuration.recovery_startup_jitter = 0
+      allow(coordinator).to receive(:recover_entry).and_return(0)
+
+      coordinator.send(:recover_missed_runs)
+
+      expect(logger).to have_received(:info).with(/Starting missed-run recovery for window/)
+    end
+
+    it 'logs recovery completion with total count' do
+      configuration.enable_dispatch_recovery = true
+      configuration.recovery_startup_jitter = 0
+      registry.add(key: 'job1', cron: '* * * * *', enqueue: kw_enqueue)
+      allow(coordinator).to receive(:recover_entry).and_return(5)
+
+      coordinator.send(:recover_missed_runs)
+
+      expect(logger).to have_received(:info).with(/Missed-run recovery completed: attempted 5 dispatches/)
+    end
+
+    it 'handles errors gracefully and logs them' do
+      configuration.enable_dispatch_recovery = true
+      configuration.recovery_startup_jitter = 0
+      registry.add(key: 'job1', cron: '* * * * *', enqueue: kw_enqueue)
+      allow(coordinator).to receive(:recover_entry).and_raise(StandardError, 'Recovery error')
+
+      coordinator.send(:recover_missed_runs)
+
+      expect(logger).to have_received(:error).with(/Error during missed-run recovery/)
+    end
+
+    it 'works without logger' do
+      configuration.enable_dispatch_recovery = true
+      configuration.recovery_startup_jitter = 0
+      configuration.logger = nil
+      registry.add(key: 'job1', cron: '* * * * *', enqueue: kw_enqueue)
+
+      expect { coordinator.send(:recover_missed_runs) }.not_to raise_error
+    end
+
+    it 'handles errors during recovery without logger' do
+      configuration.enable_dispatch_recovery = true
+      configuration.recovery_startup_jitter = 0
+      configuration.logger = nil
+      allow(coordinator).to receive(:recover_entry).and_raise(StandardError, 'Recovery failed')
+      registry.add(key: 'job1', cron: '* * * * *', enqueue: kw_enqueue)
+
+      expect { coordinator.send(:recover_missed_runs) }.not_to raise_error
+    end
+
+    it 'handles empty registry gracefully' do
+      configuration.enable_dispatch_recovery = true
+      configuration.recovery_startup_jitter = 0
+      allow(coordinator).to receive(:recover_entry)
+
+      coordinator.send(:recover_missed_runs)
+
+      expect(coordinator).not_to have_received(:recover_entry)
+    end
+  end
+  # rubocop:enable RSpec/SubjectStub
+
+  describe '#cleanup_old_dispatch_records' do
+    it 'calls cleanup on dispatch registry when adapter responds to :dispatch_registry' do
+      adapter = double
+      registry_double = double
+      configuration.lock_adapter = adapter
+      allow(adapter).to receive(:respond_to?).with(:dispatch_registry).and_return(true)
+      allow(adapter).to receive(:dispatch_registry).and_return(registry_double)
+      allow(registry_double).to receive(:respond_to?).with(:cleanup).and_return(true)
+      allow(registry_double).to receive(:cleanup).and_return(5)
+
+      coordinator.send(:cleanup_old_dispatch_records, 86_400)
+
+      expect(registry_double).to have_received(:cleanup).with(recovery_window: 86_400)
+    end
+
+    it 'logs cleaned up record count' do
+      adapter = double
+      registry_double = double
+      configuration.lock_adapter = adapter
+      allow(adapter).to receive(:respond_to?).with(:dispatch_registry).and_return(true)
+      allow(adapter).to receive(:dispatch_registry).and_return(registry_double)
+      allow(registry_double).to receive(:respond_to?).with(:cleanup).and_return(true)
+      allow(registry_double).to receive(:cleanup).and_return(10)
+
+      coordinator.send(:cleanup_old_dispatch_records, 86_400)
+
+      expect(logger).to have_received(:debug).with(/Cleaned up 10 old dispatch records/)
+    end
+
+    it 'handles cleanup errors gracefully' do
+      adapter = double
+      configuration.lock_adapter = adapter
+      allow(adapter).to receive(:respond_to?).with(:dispatch_registry).and_return(true)
+      allow(adapter).to receive(:dispatch_registry).and_raise(StandardError, 'Cleanup error')
+
+      expect { coordinator.send(:cleanup_old_dispatch_records, 86_400) }.not_to raise_error
+      expect(logger).to have_received(:warn).with(/Error cleaning up old dispatch records/)
+    end
+
+    it 'returns early if lock adapter is nil' do
+      configuration.lock_adapter = nil
+
+      expect { coordinator.send(:cleanup_old_dispatch_records, 86_400) }.not_to raise_error
+    end
+
+    it 'returns early if dispatch_registry not supported' do
+      adapter = double
+      configuration.lock_adapter = adapter
+      allow(adapter).to receive(:respond_to?).with(:dispatch_registry).and_return(false)
+
+      expect { coordinator.send(:cleanup_old_dispatch_records, 86_400) }.not_to raise_error
+    end
+
+    it 'returns early if cleanup method not supported' do
+      adapter = double
+      registry_double = double
+      configuration.lock_adapter = adapter
+      allow(adapter).to receive(:respond_to?).with(:dispatch_registry).and_return(true)
+      allow(adapter).to receive(:dispatch_registry).and_return(registry_double)
+      allow(registry_double).to receive(:respond_to?).with(:cleanup).and_return(false)
+
+      expect { coordinator.send(:cleanup_old_dispatch_records, 86_400) }.not_to raise_error
+    end
+
+    it 'does not log when cleanup returns 0' do
+      adapter = double
+      registry_double = double
+      configuration.lock_adapter = adapter
+      allow(adapter).to receive(:respond_to?).with(:dispatch_registry).and_return(true)
+      allow(adapter).to receive(:dispatch_registry).and_return(registry_double)
+      allow(registry_double).to receive(:respond_to?).with(:cleanup).and_return(true)
+      allow(registry_double).to receive(:cleanup).and_return(0)
+
+      coordinator.send(:cleanup_old_dispatch_records, 86_400)
+
+      # Should not have debug calls for 0 records
+      expect(logger).not_to have_received(:debug)
+    end
+
+    it 'skips cleanup if recovery_window is 0' do
+      adapter = double
+      registry_double = double
+      configuration.lock_adapter = adapter
+      allow(adapter).to receive(:respond_to?).with(:dispatch_registry).and_return(true)
+      allow(adapter).to receive(:dispatch_registry).and_return(registry_double)
+      allow(registry_double).to receive(:respond_to?).with(:cleanup).and_return(true)
+      allow(registry_double).to receive(:cleanup).and_return(0)
+
+      coordinator.send(:cleanup_old_dispatch_records, 0)
+
+      expect(registry_double).to have_received(:cleanup).with(recovery_window: 0)
+    end
+
+    it 'works without logger when cleanup succeeds' do
+      adapter = double
+      registry_double = double
+      configuration.lock_adapter = adapter
+      configuration.logger = nil
+      allow(adapter).to receive(:respond_to?).with(:dispatch_registry).and_return(true)
+      allow(adapter).to receive(:dispatch_registry).and_return(registry_double)
+      allow(registry_double).to receive(:respond_to?).with(:cleanup).and_return(true)
+      allow(registry_double).to receive(:cleanup).and_return(5)
+
+      expect { coordinator.send(:cleanup_old_dispatch_records, 86_400) }.not_to raise_error
+    end
+
+    it 'works without logger when cleanup fails' do
+      adapter = double
+      configuration.lock_adapter = adapter
+      configuration.logger = nil
+      allow(adapter).to receive(:respond_to?).with(:dispatch_registry).and_return(true)
+      allow(adapter).to receive(:dispatch_registry).and_raise(StandardError, 'Cleanup failed')
+
+      expect { coordinator.send(:cleanup_old_dispatch_records, 86_400) }.not_to raise_error
+    end
+  end
+
+  # rubocop:disable RSpec/SubjectStub
+  describe '#recover_entry' do
+    let(:entry) { instance_double(RailsCron::Registry::Entry, key: 'test_job', cron: '* * * * *', enqueue: kw_enqueue) }
+    let(:recovery_start) { Time.current - 3600 }
+    let(:recovery_end) { Time.current }
+
+    it 'returns 0 when cron expression cannot be parsed' do
+      invalid_entry = instance_double(RailsCron::Registry::Entry, key: 'bad_job', cron: 'invalid')
+      allow(coordinator).to receive(:parse_cron).and_return(nil)
+
+      result = coordinator.send(:recover_entry, invalid_entry, recovery_start, recovery_end)
+
+      expect(result).to eq(0)
+    end
+
+    it 'uses find_occurrences to get all missed runs' do
+      cron = double
+      allow(coordinator).to receive_messages(parse_cron: cron, find_occurrences: [])
+
+      coordinator.send(:recover_entry, entry, recovery_start, recovery_end)
+
+      expect(coordinator).to have_received(:find_occurrences).with(cron, recovery_start, recovery_end)
+    end
+
+    it 'filters out already-dispatched runs when logging is enabled' do
+      configuration.enable_log_dispatch_registry = true
+      cron = double
+      fire_time1 = Time.current - 300
+      fire_time2 = Time.current - 200
+      fire_time3 = Time.current - 100
+
+      allow(coordinator).to receive_messages(parse_cron: cron, find_occurrences: [fire_time1, fire_time2, fire_time3])
+      allow(coordinator).to receive(:already_dispatched?).with(entry.key, fire_time1).and_return(true)
+      allow(coordinator).to receive(:already_dispatched?).with(entry.key, fire_time2).and_return(false)
+      allow(coordinator).to receive(:already_dispatched?).with(entry.key, fire_time3).and_return(false)
+      allow(coordinator).to receive(:dispatch_if_due)
+
+      result = coordinator.send(:recover_entry, entry, recovery_start, recovery_end)
+
+      expect(coordinator).to have_received(:dispatch_if_due).with(entry, fire_time2, anything).once
+      expect(coordinator).to have_received(:dispatch_if_due).with(entry, fire_time3, anything).once
+      expect(result).to eq(2)
+    end
+
+    it 'does not filter when logging is disabled' do
+      configuration.enable_log_dispatch_registry = false
+      cron = double
+      fire_time1 = Time.current - 300
+      fire_time2 = Time.current - 200
+
+      allow(coordinator).to receive_messages(parse_cron: cron, find_occurrences: [fire_time1, fire_time2])
+      allow(coordinator).to receive(:already_dispatched?)
+      allow(coordinator).to receive(:dispatch_if_due)
+
+      result = coordinator.send(:recover_entry, entry, recovery_start, recovery_end)
+
+      expect(coordinator).not_to have_received(:already_dispatched?)
+      expect(coordinator).to have_received(:dispatch_if_due).twice
+      expect(result).to eq(2)
+    end
+
+    it 'calls dispatch_if_due for each occurrence' do
+      cron = double
+      fire_time1 = Time.current - 300
+      fire_time2 = Time.current - 200
+
+      allow(coordinator).to receive_messages(parse_cron: cron, find_occurrences: [fire_time1, fire_time2])
+      allow(coordinator).to receive(:dispatch_if_due)
+
+      coordinator.send(:recover_entry, entry, recovery_start, recovery_end)
+
+      expect(coordinator).to have_received(:dispatch_if_due).with(entry, fire_time1, anything)
+      expect(coordinator).to have_received(:dispatch_if_due).with(entry, fire_time2, anything)
+    end
+
+    it 'logs the number of occurrences found' do
+      cron = double
+      allow(coordinator).to receive_messages(parse_cron: cron, find_occurrences: [Time.current - 300, Time.current - 200])
+      allow(coordinator).to receive(:dispatch_if_due)
+
+      coordinator.send(:recover_entry, entry, recovery_start, recovery_end)
+
+      expect(logger).to have_received(:info).with(/Recovering 2 missed runs for test_job/)
+    end
+
+    it 'returns the count of occurrences attempted' do
+      cron = double
+      allow(coordinator).to receive_messages(parse_cron: cron, find_occurrences: [Time.current - 300, Time.current - 200, Time.current - 100])
+      allow(coordinator).to receive(:dispatch_if_due)
+
+      result = coordinator.send(:recover_entry, entry, recovery_start, recovery_end)
+
+      expect(result).to eq(3)
+    end
+
+    it 'handles errors gracefully and returns 0' do
+      allow(coordinator).to receive(:parse_cron).with(entry.cron).and_raise(StandardError, 'Parse error')
+
+      result = coordinator.send(:recover_entry, entry, recovery_start, recovery_end)
+
+      expect(result).to eq(0)
+      expect(logger).to have_received(:error).with(/Error recovering entry test_job/)
+    end
+
+    it 'works without logger' do
+      configuration.logger = nil
+      cron = double
+      allow(coordinator).to receive_messages(parse_cron: cron, find_occurrences: [Time.current - 300])
+      allow(coordinator).to receive(:dispatch_if_due)
+
+      result = coordinator.send(:recover_entry, entry, recovery_start, recovery_end)
+
+      expect(result).to eq(1)
+      expect { coordinator.send(:recover_entry, entry, recovery_start, recovery_end) }.not_to raise_error
+    end
+
+    it 'handles errors without logger' do
+      configuration.logger = nil
+      allow(coordinator).to receive(:parse_cron).with(entry.cron).and_raise(StandardError, 'Parse error')
+
+      result = coordinator.send(:recover_entry, entry, recovery_start, recovery_end)
+
+      expect(result).to eq(0)
+    end
+  end
+  # rubocop:enable RSpec/SubjectStub
+
+  describe '#already_dispatched?' do
+    it 'returns false when lock adapter is nil' do
+      configuration.lock_adapter = nil
+
+      result = coordinator.send(:already_dispatched?, 'test_job', Time.current)
+
+      expect(result).to be false
+    end
+
+    it 'returns false when lock adapter does not have dispatch_registry' do
+      adapter = double
+      configuration.lock_adapter = adapter
+      allow(adapter).to receive(:respond_to?).with(:dispatch_registry).and_return(false)
+
+      result = coordinator.send(:already_dispatched?, 'test_job', Time.current)
+
+      expect(result).to be false
+    end
+
+    it 'returns true when dispatch registry shows job was dispatched' do
+      adapter = double
+      registry_double = double
+      configuration.lock_adapter = adapter
+      allow(adapter).to receive(:respond_to?).with(:dispatch_registry).and_return(true)
+      allow(adapter).to receive(:dispatch_registry).and_return(registry_double)
+      allow(registry_double).to receive(:dispatched?).and_return(true)
+
+      result = coordinator.send(:already_dispatched?, 'test_job', Time.current)
+
+      expect(result).to be true
+    end
+
+    it 'returns false when dispatch registry shows job was not dispatched' do
+      adapter = double
+      registry_double = double
+      configuration.lock_adapter = adapter
+      allow(adapter).to receive(:respond_to?).with(:dispatch_registry).and_return(true)
+      allow(adapter).to receive(:dispatch_registry).and_return(registry_double)
+      allow(registry_double).to receive(:dispatched?).and_return(false)
+
+      result = coordinator.send(:already_dispatched?, 'test_job', Time.current)
+
+      expect(result).to be false
+    end
+
+    it 'handles errors gracefully and logs them' do
+      adapter = double
+      configuration.lock_adapter = adapter
+      allow(adapter).to receive(:respond_to?).with(:dispatch_registry).and_return(true)
+      allow(adapter).to receive(:dispatch_registry).and_raise(StandardError, 'Registry error')
+
+      result = coordinator.send(:already_dispatched?, 'test_job', Time.current)
+
+      expect(result).to be false
+      expect(logger).to have_received(:warn).with(/Error checking dispatch status/)
+    end
+
+    it 'works without logger' do
+      configuration.logger = nil
+      adapter = double
+      configuration.lock_adapter = adapter
+      allow(adapter).to receive(:respond_to?).with(:dispatch_registry).and_return(true)
+      allow(adapter).to receive(:dispatch_registry).and_raise(StandardError, 'Registry error')
+
+      expect { coordinator.send(:already_dispatched?, 'test_job', Time.current) }.not_to raise_error
+    end
+  end
+
+  # rubocop:disable RSpec/SubjectStub
+  describe 'recovery integration with start!' do
+    it 'runs recovery before starting the main loop' do
+      configuration.enable_dispatch_recovery = true
+      configuration.recovery_startup_jitter = 0 # Disable jitter for test
+      configuration.recovery_window = 60 # Use small window to avoid expensive computations
+      registry.add(key: 'job1', cron: '* * * * *', enqueue: kw_enqueue)
+
+      # Track that recovery was called
+      recovery_called = false
+      allow(coordinator).to receive(:recover_missed_runs).and_wrap_original do |method, *args|
+        recovery_called = true
+        method.call(*args)
+      end
+
+      coordinator.start!
+
+      expect(recovery_called).to be true
+      expect(coordinator.running?).to be true
+
+      coordinator.stop!
+    end
+
+    it 'skips recovery when disabled' do
+      configuration.enable_dispatch_recovery = false
+      allow(coordinator).to receive(:recover_entry)
+
+      coordinator.start!
+
+      expect(coordinator).not_to have_received(:recover_entry)
+
+      coordinator.stop!
+    end
+
+    it 'continues to main loop even if recovery has errors' do
+      configuration.enable_dispatch_recovery = true
+      configuration.recovery_startup_jitter = 0
+      configuration.recovery_window = 60
+      registry.add(key: 'job1', cron: '* * * * *', enqueue: kw_enqueue)
+      # Make recovery raise an error via recover_entry
+      allow(coordinator).to receive(:recover_entry).and_raise(StandardError, 'Recovery failed')
+
+      coordinator.start!
+
+      # Coordinator should still be running despite recovery error
+      expect(coordinator.running?).to be true
+      expect(logger).to have_received(:error).with(/Error during missed-run recovery/)
+
+      coordinator.stop!
+    end
+  end
+  # rubocop:enable RSpec/SubjectStub
 end

@@ -22,7 +22,11 @@ RSpec.describe RailsCron::Configuration do
       namespace: 'railscron',
       lock_adapter: nil,
       logger: nil,
-      time_zone: nil
+      time_zone: nil,
+      enable_log_dispatch_registry: false,
+      enable_dispatch_recovery: true,
+      recovery_window: 86_400,
+      recovery_startup_jitter: 5
     }
   end
 

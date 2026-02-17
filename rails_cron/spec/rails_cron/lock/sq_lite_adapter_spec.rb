@@ -14,6 +14,21 @@ describe RailsCron::Lock::SQLiteAdapter do
     RailsCron::CronLock.delete_all
   end
 
+  describe 'initialization' do
+    it 'creates a new sqlite adapter' do
+      adapter = described_class.new
+      expect(adapter).to be_a(described_class)
+    end
+
+    it 'has a dispatch_registry method' do
+      expect(adapter).to respond_to(:dispatch_registry)
+    end
+
+    it 'returns a DatabaseEngine for dispatch_registry' do
+      expect(adapter.dispatch_registry).to be_a(RailsCron::Dispatch::DatabaseEngine)
+    end
+  end
+
   describe '#acquire' do
     it 'returns true when lock is acquired for new key' do
       result = adapter.acquire('test:key:123', 60)
@@ -80,6 +95,44 @@ describe RailsCron::Lock::SQLiteAdapter do
 
       expect(result_a).to be(true)
       expect(result_b).to be(true)
+    end
+
+    context 'with dispatch logging enabled' do
+      before do
+        RailsCron.configuration.enable_log_dispatch_registry = true
+      end
+
+      after do
+        RailsCron.configuration.enable_log_dispatch_registry = false
+      end
+
+      it 'logs dispatch when lock is acquired' do
+        expect { adapter.acquire('railscron:dispatch:myjob:1609459200', 60) }.not_to raise_error
+      end
+
+      it 'logs error if dispatch logging fails' do
+        allow(adapter.dispatch_registry).to receive(:log_dispatch).and_raise(StandardError, 'DB error')
+
+        logger = instance_double(Logger)
+        allow(RailsCron.configuration).to receive(:logger).and_return(logger)
+        allow(logger).to receive(:error)
+
+        expect { adapter.acquire('railscron:dispatch:job:1234567890', 60) }.not_to raise_error
+        expect(logger).to have_received(:error).with(/Failed to log dispatch/)
+      end
+    end
+
+    context 'with dispatch logging disabled' do
+      before do
+        RailsCron.configuration.enable_log_dispatch_registry = false
+      end
+
+      it 'does not attempt to log dispatch' do
+        allow(adapter.dispatch_registry).to receive(:log_dispatch)
+
+        expect { adapter.acquire('lock-key', 60) }.not_to raise_error
+        expect(adapter.dispatch_registry).not_to have_received(:log_dispatch)
+      end
     end
   end
 

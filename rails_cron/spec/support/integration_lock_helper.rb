@@ -72,8 +72,7 @@ module IntegrationLockHelper
                Thread.new do
                  ActiveRecord::Base.connection_pool.with_connection do
                    adapter_class = lock_adapter.class
-                   adapter_kwargs = lock_adapter.log_dispatch ? { log_dispatch: lock_adapter.log_dispatch } : {}
-                   adapter_class.new(**adapter_kwargs).with_lock(key, ttl: ttl) { sleep hold_for }
+                   adapter_class.new.with_lock(key, ttl: ttl) { sleep hold_for }
                  end
                end
              else
