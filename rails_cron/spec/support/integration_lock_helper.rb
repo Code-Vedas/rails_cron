@@ -52,7 +52,11 @@ module IntegrationLockHelper
   end
 
   def cleanup_lock_keys(label)
-    return if label == 'pg'
+    # PostgreSQL and MySQL have connection-based locks that auto-release when the
+    # connection closes. Attempting to release from a different connection causes
+    # warnings (e.g., PostgreSQL: "you don't own a lock of type ExclusiveLock").
+    # Only cleanup adapters that need explicit release.
+    return if %w[pg mysql].include?(label)
 
     integration_used_keys(label).each do |key|
       lock_adapter.release(key)
@@ -63,10 +67,13 @@ module IntegrationLockHelper
   end
 
   def with_held_lock(key, ttl: 30, hold_for: 0.1)
-    thread = if lock_adapter.is_a?(RailsCron::Lock::PostgresAdapter)
+    # PostgreSQL and MySQL adapters require connection pool handling for separate connections
+    thread = if [RailsCron::Lock::PostgresAdapter, RailsCron::Lock::MySQLAdapter].any? { |klass| lock_adapter.is_a?(klass) }
                Thread.new do
                  ActiveRecord::Base.connection_pool.with_connection do
-                   RailsCron::Lock::PostgresAdapter.new(log_dispatch: lock_adapter.log_dispatch).with_lock(key, ttl: ttl) { sleep hold_for }
+                   adapter_class = lock_adapter.class
+                   adapter_kwargs = lock_adapter.log_dispatch ? { log_dispatch: lock_adapter.log_dispatch } : {}
+                   adapter_class.new(**adapter_kwargs).with_lock(key, ttl: ttl) { sleep hold_for }
                  end
                end
              else
@@ -86,6 +93,12 @@ module IntegrationLockHelper
     when 'pg'
       database_url = ENV.fetch('DATABASE_URL', nil)
       raise 'DATABASE_URL must be set for pg integration tests' if database_url.to_s.strip.empty?
+
+      ActiveRecord::Base.establish_connection(database_url)
+      ActiveRecord::Migration.maintain_test_schema!
+    when 'mysql'
+      database_url = ENV.fetch('DATABASE_URL', nil)
+      raise 'DATABASE_URL must be set for mysql integration tests' if database_url.to_s.strip.empty?
 
       ActiveRecord::Base.establish_connection(database_url)
       ActiveRecord::Migration.maintain_test_schema!

@@ -46,8 +46,11 @@ detectors:
     exclude:
       - RailsCron::Registry#callable?
       - RailsCron::Lock::PostgresAdapter#calculate_lock_id
-      - RailsCron::Lock::PostgresAdapter#parse_lock_key
+      - RailsCron::Lock::DispatchLogging#parse_lock_key
+      - RailsCron::Lock::PostgresAdapter#cast_to_boolean
       - RailsCron::Lock::RedisAdapter#generate_lock_value
+      - RailsCron::Lock::MySQLAdapter#cast_to_boolean
+      - RailsCron::Lock::MySQLAdapter#normalize_lock_name
   FeatureEnvy:
     enabled: true
     exclude:
@@ -60,6 +63,7 @@ detectors:
     exclude:
       - RailsCron::Coordinator#stop!
       - RailsCron::Lock::RedisAdapter#initialize
+      - RailsCron::Lock::MySQLAdapter#cast_to_boolean
 
 exclude_paths:
   - spec/**/*

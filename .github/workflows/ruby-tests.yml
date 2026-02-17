@@ -29,6 +29,18 @@ jobs:
       contents: read
     runs-on: ubuntu-latest
     services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: rootROOT!1
+          MYSQL_DATABASE: rails_crons_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -p$MYSQL_ROOT_PASSWORD"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
       postgres:
         image: postgres
         env:
@@ -52,7 +64,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y \
-            build-essential git libpq-dev libyaml-dev pkg-config
+            build-essential git libpq-dev libyaml-dev pkg-config libmysqlclient-dev
       - name: Checkout
         uses: actions/checkout@v6
       - name: Set up Ruby
@@ -91,6 +103,16 @@ jobs:
           bin/rails db:create
           bin/rails db:schema:load
           bin/rspec-e2e pg
+      - name: Run e2e mysql
+        working-directory: ${{ env.APP_DIR }}
+        env:
+          RAILS_ENV: test
+          DATABASE_URL: mysql2://root:rootROOT!1@127.0.0.1:3306/rails_crons_test
+        run: |
+          bin/rails db:drop || true
+          bin/rails db:create
+          bin/rails db:schema:load
+          bin/rspec-e2e mysql
       - name: Run e2e redis
         working-directory: ${{ env.APP_DIR }}
         env:

@@ -1,6 +1,6 @@
 GIT
   remote: https://github.com/rails/rails.git
-  revision: e3ef3d50ebb440072d2ad9352ca5e22ebad81485
+  revision: 8fc1cc0451a8aa92783e9656bd9a29ba45218302
   branch: main
   specs:
     actioncable (8.2.0.alpha)
@@ -246,6 +246,8 @@ GEM
     mini_mime (1.1.5)
     minitest (6.0.1)
       prism (~> 1.5)
+    mysql2 (0.5.7)
+      bigdecimal
     nap (1.1.0)
     net-http (0.9.1)
       uri (>= 0.11.1)
@@ -459,6 +461,7 @@ DEPENDENCIES
   fakeredis
   faraday-retry
   i18n-tasks (~> 1.0)
+  mysql2
   pg (~> 1.1)
   rails!
   rails_cron!
