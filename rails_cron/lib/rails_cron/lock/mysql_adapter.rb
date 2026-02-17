@@ -144,7 +144,7 @@ module RailsCron
         prefix_length = MAX_LOCK_NAME_LENGTH - 17
         normalized = "#{key[0...prefix_length]}:#{digest[0...16]}"
 
-        RailsCron.logger.warn(
+        RailsCron.logger&.warn(
           "Lock key '#{key}' exceeds MySQL named lock limit of #{MAX_LOCK_NAME_LENGTH} characters. " \
           "Using hash-based shortening to avoid collisions: '#{normalized}'."
         )

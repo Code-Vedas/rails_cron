@@ -75,11 +75,11 @@ RSpec.describe RailsCron::Lock::MySQLAdapter do
       long_key = 'a' * 100
       result_set = [{ 'lock_result' => 1 }]
       allow(mock_connection).to receive(:execute).and_return(result_set)
-      allow(Rails.logger).to receive(:warn)
+      allow(RailsCron.logger).to receive(:warn)
 
       adapter.acquire(long_key, 60)
 
-      expect(Rails.logger).to have_received(:warn) do |message|
+      expect(RailsCron.logger).to have_received(:warn) do |message|
         expect(message).to include('hash-based shortening')
         expect(message).to include('avoid collisions')
       end
@@ -183,11 +183,11 @@ RSpec.describe RailsCron::Lock::MySQLAdapter do
       long_key = 'b' * 100
       result_set = [{ 'lock_result' => 1 }]
       allow(mock_connection).to receive(:execute).and_return(result_set)
-      allow(Rails.logger).to receive(:warn)
+      allow(RailsCron.logger).to receive(:warn)
 
       adapter.release(long_key)
 
-      expect(Rails.logger).to have_received(:warn) do |message|
+      expect(RailsCron.logger).to have_received(:warn) do |message|
         expect(message).to include('hash-based shortening')
         expect(message).to include('avoid collisions')
       end
@@ -286,11 +286,11 @@ RSpec.describe RailsCron::Lock::MySQLAdapter do
       key = 'a' * 65
       result_set = [{ 'lock_result' => 1 }]
       allow(mock_connection).to receive(:execute).and_return(result_set)
-      allow(Rails.logger).to receive(:warn)
+      allow(RailsCron.logger).to receive(:warn)
 
       adapter.acquire(key, 60)
 
-      expect(Rails.logger).to have_received(:warn) do |message|
+      expect(RailsCron.logger).to have_received(:warn) do |message|
         expect(message).to include('exceeds MySQL named lock limit')
         expect(message).to include('hash-based shortening')
       end
@@ -308,6 +308,38 @@ RSpec.describe RailsCron::Lock::MySQLAdapter do
       normalized1 = adapter.send(:normalize_lock_name, key1)
       normalized2 = adapter.send(:normalize_lock_name, key2)
       expect(normalized1).not_to eq(normalized2)
+    end
+
+    context 'when RailsCron.logger is nil' do
+      it 'handles long keys in acquire without error when logger is nil' do
+        long_key = 'x' * 100
+        result_set = [{ 'lock_result' => 1 }]
+        allow(mock_connection).to receive(:execute).and_return(result_set)
+        allow(RailsCron).to receive(:logger).and_return(nil)
+
+        expect do
+          adapter.acquire(long_key, 60)
+        end.not_to raise_error
+      end
+
+      it 'handles long keys in release without error when logger is nil' do
+        long_key = 'y' * 100
+        result_set = [{ 'lock_result' => 1 }]
+        allow(mock_connection).to receive(:execute).and_return(result_set)
+        allow(RailsCron).to receive(:logger).and_return(nil)
+
+        expect do
+          adapter.release(long_key)
+        end.not_to raise_error
+      end
+
+      it 'normalizes long keys correctly even when logger is nil' do
+        long_key = 'z' * 100
+        allow(RailsCron).to receive(:logger).and_return(nil)
+
+        normalized = adapter.send(:normalize_lock_name, long_key)
+        expect(normalized.length).to eq(64)
+      end
     end
   end
 
