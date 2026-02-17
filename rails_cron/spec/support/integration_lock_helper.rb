@@ -52,7 +52,10 @@ module IntegrationLockHelper
   end
 
   def cleanup_lock_keys(label)
-    # PostgreSQL and MySQL have connection-based locks, skip explicit cleanup
+    # PostgreSQL and MySQL have connection-based locks that auto-release when the
+    # connection closes. Attempting to release from a different connection causes
+    # warnings (e.g., PostgreSQL: "you don't own a lock of type ExclusiveLock").
+    # Only cleanup adapters that need explicit release.
     return if %w[pg mysql].include?(label)
 
     integration_used_keys(label).each do |key|
