@@ -75,11 +75,13 @@ RSpec.describe RailsCron::Lock::MySQLAdapter do
       long_key = 'a' * 100
       result_set = [{ 'lock_result' => 1 }]
       allow(mock_connection).to receive(:execute).and_return(result_set)
-      allow(RailsCron.logger).to receive(:warn)
+      logger_double = instance_double(Logger)
+      allow(RailsCron).to receive(:logger).and_return(logger_double)
+      allow(logger_double).to receive(:warn)
 
       adapter.acquire(long_key, 60)
 
-      expect(RailsCron.logger).to have_received(:warn) do |message|
+      expect(logger_double).to have_received(:warn) do |message|
         expect(message).to include('hash-based shortening')
         expect(message).to include('avoid collisions')
       end
@@ -183,11 +185,13 @@ RSpec.describe RailsCron::Lock::MySQLAdapter do
       long_key = 'b' * 100
       result_set = [{ 'lock_result' => 1 }]
       allow(mock_connection).to receive(:execute).and_return(result_set)
-      allow(RailsCron.logger).to receive(:warn)
+      logger_double = instance_double(Logger)
+      allow(RailsCron).to receive(:logger).and_return(logger_double)
+      allow(logger_double).to receive(:warn)
 
       adapter.release(long_key)
 
-      expect(RailsCron.logger).to have_received(:warn) do |message|
+      expect(logger_double).to have_received(:warn) do |message|
         expect(message).to include('hash-based shortening')
         expect(message).to include('avoid collisions')
       end
@@ -286,11 +290,13 @@ RSpec.describe RailsCron::Lock::MySQLAdapter do
       key = 'a' * 65
       result_set = [{ 'lock_result' => 1 }]
       allow(mock_connection).to receive(:execute).and_return(result_set)
-      allow(RailsCron.logger).to receive(:warn)
+      logger_double = instance_double(Logger)
+      allow(RailsCron).to receive(:logger).and_return(logger_double)
+      allow(logger_double).to receive(:warn)
 
       adapter.acquire(key, 60)
 
-      expect(RailsCron.logger).to have_received(:warn) do |message|
+      expect(logger_double).to have_received(:warn) do |message|
         expect(message).to include('exceeds MySQL named lock limit')
         expect(message).to include('hash-based shortening')
       end
