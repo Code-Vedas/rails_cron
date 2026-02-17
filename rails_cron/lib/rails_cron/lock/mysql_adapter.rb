@@ -73,11 +73,11 @@ module RailsCron
         lock_name = truncate_lock_name(key)
 
         # GET_LOCK returns 1 on success, 0 on timeout, NULL on error
-        sql = ActiveRecord::Base.sanitize_sql_array(['SELECT GET_LOCK(?, 0)', lock_name])
+        sql = ActiveRecord::Base.sanitize_sql_array(['SELECT GET_LOCK(?, 0) as lock_result', lock_name])
         result_set = ActiveRecord::Base.connection.execute(sql)
         # Convert result to array and get first row, then first column value
         result_row = result_set.to_a.first
-        result_value = result_row.is_a?(Hash) ? result_row['GET_LOCK(?, 0)'] : result_row&.first
+        result_value = result_row.is_a?(Hash) ? result_row['lock_result'] : result_row&.first
         acquired = cast_to_boolean(result_value)
 
         log_dispatch_attempt(key) if acquired && @log_dispatch
@@ -96,11 +96,11 @@ module RailsCron
         lock_name = truncate_lock_name(key)
 
         # RELEASE_LOCK returns 1 if held and released, 0 if not held, NULL on error
-        sql = ActiveRecord::Base.sanitize_sql_array(['SELECT RELEASE_LOCK(?)', lock_name])
+        sql = ActiveRecord::Base.sanitize_sql_array(['SELECT RELEASE_LOCK(?) as lock_result', lock_name])
         result_set = ActiveRecord::Base.connection.execute(sql)
         # Convert result to array and get first row, then first column value
         result_row = result_set.to_a.first
-        result_value = result_row.is_a?(Hash) ? result_row['RELEASE_LOCK(?)'] : result_row&.first
+        result_value = result_row.is_a?(Hash) ? result_row['lock_result'] : result_row&.first
         cast_to_boolean(result_value)
       rescue StandardError => e
         raise LockAdapterError, "MySQL release failed for #{key}: #{e.message}"

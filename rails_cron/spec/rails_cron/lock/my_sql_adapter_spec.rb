@@ -34,7 +34,7 @@ RSpec.describe RailsCron::Lock::MySQLAdapter do
 
   describe '#acquire' do
     it 'returns true when lock is acquired' do
-      result_set = [{ 'GET_LOCK(?, 0)' => 1 }]
+      result_set = [{ 'lock_result' => 1 }]
       allow(mock_connection).to receive(:execute).and_return(result_set)
 
       result = adapter.acquire('railscron:dispatch:job1:1234567890', 60)
@@ -43,7 +43,7 @@ RSpec.describe RailsCron::Lock::MySQLAdapter do
     end
 
     it 'returns false when lock is not acquired' do
-      result_set = [{ 'GET_LOCK(?, 0)' => 0 }]
+      result_set = [{ 'lock_result' => 0 }]
       allow(mock_connection).to receive(:execute).and_return(result_set)
 
       result = adapter.acquire('railscron:dispatch:job1:1234567890', 60)
@@ -52,28 +52,28 @@ RSpec.describe RailsCron::Lock::MySQLAdapter do
     end
 
     it 'handles nil result from GET_LOCK (error case) as false' do
-      result_set = [{ 'GET_LOCK(?, 0)' => nil }]
+      result_set = [{ 'lock_result' => nil }]
       allow(mock_connection).to receive(:execute).and_return(result_set)
 
       result = adapter.acquire('railscron:dispatch:job1:1234567890', 60)
       expect(result).to be(false)
     end
 
-    it 'sends correct SQL with GET_LOCK with zero timeout' do
-      result_set = [{ 'GET_LOCK(?, 0)' => 1 }]
+    it 'sends correct SQL with GET_LOCK with stable alias' do
+      result_set = [{ 'lock_result' => 1 }]
       allow(mock_connection).to receive(:execute).and_return(result_set)
       allow(ActiveRecord::Base).to receive(:sanitize_sql_array).and_call_original
 
       adapter.acquire('test-key', 60)
 
       expect(ActiveRecord::Base).to have_received(:sanitize_sql_array).with(
-        ['SELECT GET_LOCK(?, 0)', 'test-key']
+        ['SELECT GET_LOCK(?, 0) as lock_result', 'test-key']
       )
     end
 
     it 'truncates lock names longer than 64 characters' do
       long_key = 'a' * 100
-      result_set = [{ 'GET_LOCK(?, 0)' => 1 }]
+      result_set = [{ 'lock_result' => 1 }]
       allow(mock_connection).to receive(:execute).and_return(result_set)
       allow(Rails.logger).to receive(:warn)
 
@@ -93,15 +93,29 @@ RSpec.describe RailsCron::Lock::MySQLAdapter do
     context 'with log_dispatch enabled' do
       let(:adapter) { described_class.new(log_dispatch: true) }
 
-      it 'attempts to log dispatch when lock is acquired' do
-        result_set = [{ 'GET_LOCK(?, 0)' => 1 }]
+      it 'invokes log_dispatch_attempt when lock is acquired' do
+        result_set = [{ 'lock_result' => 1 }]
         allow(mock_connection).to receive(:execute).and_return(result_set)
+        allow(adapter).to receive(:log_dispatch_attempt).and_call_original
+        allow(RailsCron::CronDispatch).to receive(:create!).and_return(double)
 
-        expect { adapter.acquire('railscron:dispatch:myjob:1609459200', 60) }.not_to raise_error
+        adapter.acquire('railscron:dispatch:myjob:1609459200', 60)
+
+        expect(adapter).to have_received(:log_dispatch_attempt).with('railscron:dispatch:myjob:1609459200')
+      end
+
+      it 'does not invoke log_dispatch_attempt when lock is not acquired' do
+        result_set = [{ 'lock_result' => 0 }]
+        allow(mock_connection).to receive(:execute).and_return(result_set)
+        allow(adapter).to receive(:log_dispatch_attempt)
+
+        adapter.acquire('railscron:dispatch:myjob:1609459200', 60)
+
+        expect(adapter).not_to have_received(:log_dispatch_attempt)
       end
 
       it 'raises LockAdapterError if CronDispatch.create! fails' do
-        result_set = [{ 'GET_LOCK(?, 0)' => 1 }]
+        result_set = [{ 'lock_result' => 1 }]
         allow(mock_connection).to receive(:execute).and_return(result_set)
         allow(RailsCron::CronDispatch).to receive(:create!).and_raise(StandardError, 'DB error')
 
@@ -115,7 +129,7 @@ RSpec.describe RailsCron::Lock::MySQLAdapter do
       let(:adapter) { described_class.new(log_dispatch: false) }
 
       it 'does not attempt to log dispatch' do
-        result_set = [{ 'GET_LOCK(?, 0)' => 1 }]
+        result_set = [{ 'lock_result' => 1 }]
         allow(mock_connection).to receive(:execute).and_return(result_set)
 
         expect { adapter.acquire('lock-key', 60) }.not_to raise_error
@@ -125,7 +139,7 @@ RSpec.describe RailsCron::Lock::MySQLAdapter do
 
   describe '#release' do
     it 'returns true when lock is released' do
-      result_set = [{ 'RELEASE_LOCK(?)' => 1 }]
+      result_set = [{ 'lock_result' => 1 }]
       allow(mock_connection).to receive(:execute).and_return(result_set)
 
       result = adapter.release('lock-key')
@@ -134,7 +148,7 @@ RSpec.describe RailsCron::Lock::MySQLAdapter do
     end
 
     it 'returns false when lock was not held' do
-      result_set = [{ 'RELEASE_LOCK(?)' => 0 }]
+      result_set = [{ 'lock_result' => 0 }]
       allow(mock_connection).to receive(:execute).and_return(result_set)
 
       result = adapter.release('lock-key')
@@ -143,28 +157,28 @@ RSpec.describe RailsCron::Lock::MySQLAdapter do
     end
 
     it 'handles nil result from RELEASE_LOCK (error case) as false' do
-      result_set = [{ 'RELEASE_LOCK(?)' => nil }]
+      result_set = [{ 'lock_result' => nil }]
       allow(mock_connection).to receive(:execute).and_return(result_set)
 
       result = adapter.release('lock-key')
       expect(result).to be(false)
     end
 
-    it 'sends correct SQL with RELEASE_LOCK' do
-      result_set = [{ 'RELEASE_LOCK(?)' => 1 }]
+    it 'sends correct SQL with stable alias' do
+      result_set = [{ 'lock_result' => 1 }]
       allow(mock_connection).to receive(:execute).and_return(result_set)
       allow(ActiveRecord::Base).to receive(:sanitize_sql_array).and_call_original
 
       adapter.release('test-key')
 
       expect(ActiveRecord::Base).to have_received(:sanitize_sql_array).with(
-        ['SELECT RELEASE_LOCK(?)', 'test-key']
+        ['SELECT RELEASE_LOCK(?) as lock_result', 'test-key']
       )
     end
 
     it 'truncates lock names longer than 64 characters' do
       long_key = 'b' * 100
-      result_set = [{ 'RELEASE_LOCK(?)' => 1 }]
+      result_set = [{ 'lock_result' => 1 }]
       allow(mock_connection).to receive(:execute).and_return(result_set)
       allow(Rails.logger).to receive(:warn)
 
@@ -186,7 +200,7 @@ RSpec.describe RailsCron::Lock::MySQLAdapter do
 
   describe '#with_lock' do
     before do
-      result_set = [{ 'GET_LOCK(?, 0)' => 1 }]
+      result_set = [{ 'lock_result' => 1 }]
       allow(mock_connection).to receive(:execute).and_return(result_set)
     end
 
@@ -196,7 +210,7 @@ RSpec.describe RailsCron::Lock::MySQLAdapter do
     end
 
     it 'returns nil when lock cannot be acquired' do
-      result_set = [{ 'GET_LOCK(?, 0)' => 0 }]
+      result_set = [{ 'lock_result' => 0 }]
       allow(mock_connection).to receive(:execute).and_return(result_set)
 
       result = adapter.with_lock('lock-key', ttl: 60) { 42 }
@@ -204,14 +218,11 @@ RSpec.describe RailsCron::Lock::MySQLAdapter do
     end
 
     it 'releases lock after successful block execution' do
+      result_set = [{ 'lock_result' => 1 }]
       call_count = 0
       allow(mock_connection).to receive(:execute) do
         call_count += 1
-        if call_count == 1
-          [{ 'GET_LOCK(?, 0)' => 1 }]
-        else
-          [{ 'RELEASE_LOCK(?)' => 1 }]
-        end
+        result_set
       end
 
       adapter.with_lock('lock-key', ttl: 60) { true }
@@ -220,13 +231,12 @@ RSpec.describe RailsCron::Lock::MySQLAdapter do
     end
 
     it 'releases lock even if block raises exception' do
-      result_set_acquire = [{ 'GET_LOCK(?, 0)' => 1 }]
-      result_set_release = [{ 'RELEASE_LOCK(?)' => 1 }]
+      result_set = [{ 'lock_result' => 1 }]
 
       call_count = 0
       allow(mock_connection).to receive(:execute) do
         call_count += 1
-        call_count == 1 ? result_set_acquire : result_set_release
+        result_set
       end
 
       expect do
@@ -258,7 +268,7 @@ RSpec.describe RailsCron::Lock::MySQLAdapter do
   describe 'lock name length limit' do
     it 'allows lock names up to 64 characters' do
       key = 'a' * 64
-      result_set = [{ 'GET_LOCK(?, 0)' => 1 }]
+      result_set = [{ 'lock_result' => 1 }]
       allow(mock_connection).to receive(:execute).and_return(result_set)
 
       expect do
@@ -268,7 +278,7 @@ RSpec.describe RailsCron::Lock::MySQLAdapter do
 
     it 'truncates and warns for lock names exceeding 64 characters' do
       key = 'a' * 65
-      result_set = [{ 'GET_LOCK(?, 0)' => 1 }]
+      result_set = [{ 'lock_result' => 1 }]
       allow(mock_connection).to receive(:execute).and_return(result_set)
       allow(Rails.logger).to receive(:warn)
 
@@ -284,7 +294,7 @@ RSpec.describe RailsCron::Lock::MySQLAdapter do
 
   describe 'cast_to_boolean coverage' do
     it 'handles true boolean value directly' do
-      result_set = [{ 'GET_LOCK(?, 0)' => true }]
+      result_set = [{ 'lock_result' => true }]
       allow(mock_connection).to receive(:execute).and_return(result_set)
 
       result = adapter.acquire('test-key', 60)
@@ -292,7 +302,7 @@ RSpec.describe RailsCron::Lock::MySQLAdapter do
     end
 
     it 'handles false boolean value directly' do
-      result_set = [{ 'GET_LOCK(?, 0)' => false }]
+      result_set = [{ 'lock_result' => false }]
       allow(mock_connection).to receive(:execute).and_return(result_set)
 
       result = adapter.acquire('test-key', 60)
@@ -300,7 +310,7 @@ RSpec.describe RailsCron::Lock::MySQLAdapter do
     end
 
     it 'handles string "t" via regex fallback' do
-      result_set = [{ 'GET_LOCK(?, 0)' => 't' }]
+      result_set = [{ 'lock_result' => 't' }]
       allow(mock_connection).to receive(:execute).and_return(result_set)
 
       result = adapter.acquire('test-key', 60)
@@ -308,7 +318,7 @@ RSpec.describe RailsCron::Lock::MySQLAdapter do
     end
 
     it 'handles string "f" via regex fallback' do
-      result_set = [{ 'GET_LOCK(?, 0)' => 'f' }]
+      result_set = [{ 'lock_result' => 'f' }]
       allow(mock_connection).to receive(:execute).and_return(result_set)
 
       result = adapter.acquire('test-key', 60)
@@ -316,7 +326,7 @@ RSpec.describe RailsCron::Lock::MySQLAdapter do
     end
 
     it 'handles string "false" via regex fallback' do
-      result_set = [{ 'GET_LOCK(?, 0)' => 'false' }]
+      result_set = [{ 'lock_result' => 'false' }]
       allow(mock_connection).to receive(:execute).and_return(result_set)
 
       result = adapter.acquire('test-key', 60)
@@ -324,7 +334,7 @@ RSpec.describe RailsCron::Lock::MySQLAdapter do
     end
 
     it 'handles string "0" via regex fallback' do
-      result_set = [{ 'GET_LOCK(?, 0)' => '0' }]
+      result_set = [{ 'lock_result' => '0' }]
       allow(mock_connection).to receive(:execute).and_return(result_set)
 
       result = adapter.acquire('test-key', 60)
@@ -332,7 +342,7 @@ RSpec.describe RailsCron::Lock::MySQLAdapter do
     end
 
     it 'handles string "1" via regex fallback as truthy' do
-      result_set = [{ 'GET_LOCK(?, 0)' => '1' }]
+      result_set = [{ 'lock_result' => '1' }]
       allow(mock_connection).to receive(:execute).and_return(result_set)
 
       result = adapter.acquire('test-key', 60)
@@ -340,7 +350,7 @@ RSpec.describe RailsCron::Lock::MySQLAdapter do
     end
 
     it 'handles empty string via regex fallback as false' do
-      result_set = [{ 'GET_LOCK(?, 0)' => '' }]
+      result_set = [{ 'lock_result' => '' }]
       allow(mock_connection).to receive(:execute).and_return(result_set)
 
       result = adapter.acquire('test-key', 60)
@@ -348,7 +358,7 @@ RSpec.describe RailsCron::Lock::MySQLAdapter do
     end
 
     it 'handles arbitrary string via regex fallback as true' do
-      result_set = [{ 'GET_LOCK(?, 0)' => 'yes' }]
+      result_set = [{ 'lock_result' => 'yes' }]
       allow(mock_connection).to receive(:execute).and_return(result_set)
 
       result = adapter.acquire('test-key', 60)
