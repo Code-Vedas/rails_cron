@@ -6,6 +6,7 @@
 # LICENSE file in the root directory of this source tree.
 
 require 'socket'
+require 'digest'
 
 module RailsCron
   module Lock
@@ -21,9 +22,11 @@ module RailsCron
     #   the database connection timeout occurs (typically 28,800 seconds or 8 hours).
     #   For critical systems, consider monitoring stale locks or using a time-based
     #   fallback mechanism.
-    # - MySQL named locks can only be up to 64 characters. Lock keys longer than
-    #   64 characters are truncated (with warning), potentially causing collisions.
-    # - GET_LOCK has a configurable timeout (default 5 seconds via net_read_timeout).
+    # - MySQL named locks have a maximum length of 64 characters. Lock keys longer than
+    #   64 characters use a deterministic hash-based shortening scheme (prefix + SHA256
+    #   digest) to avoid collisions while respecting the limit.
+    # - Uses non-blocking acquisition: GET_LOCK is called with timeout=0 for immediate
+    #   return (does not block waiting for the lock).
     # - Ensure connection pooling is properly configured to release connections
     #   promptly when processes terminate.
     #
@@ -123,19 +126,35 @@ module RailsCron
         end
       end
 
+      ##
+      # Normalize lock names to fit MySQL's 64-character limit.
+      #
+      # For keys exceeding the limit, uses a deterministic hash-based scheme
+      # (prefix + SHA256 digest) to avoid collisions.
+      #
+      # @param key [String] the lock key to normalize
+      # @return [String] normalized key (max 64 characters)
+      def normalize_lock_name(key)
+        return key if key.length <= MAX_LOCK_NAME_LENGTH
+
+        # Use SHA256 digest to ensure uniqueness while respecting the 64-char limit.
+        # Format: "prefix:hash" where hash is first 16 hex chars (~8 bytes entropy)
+        digest = Digest::SHA256.hexdigest(key)
+        # Reserve 17 chars for `:` + 16 hex chars, use remainder for prefix
+        prefix_length = MAX_LOCK_NAME_LENGTH - 17
+        normalized = "#{key[0...prefix_length]}:#{digest[0...16]}"
+
+        RailsCron.logger.warn(
+          "Lock key '#{key}' exceeds MySQL named lock limit of #{MAX_LOCK_NAME_LENGTH} characters. " \
+          "Using hash-based shortening to avoid collisions: '#{normalized}'."
+        )
+
+        normalized
+      end
+
       def truncate_lock_name(key)
-        # MySQL named lock names have a maximum length of 64 characters.
-        # If the key exceeds this, truncate it and log a warning.
-        if key.length > MAX_LOCK_NAME_LENGTH
-          truncated_key = key[0...MAX_LOCK_NAME_LENGTH]
-          Rails.logger.warn(
-            "Lock key '#{key}' exceeds MySQL named lock limit of #{MAX_LOCK_NAME_LENGTH} characters. " \
-            "Truncating to '#{truncated_key}'. This may cause lock collisions."
-          )
-          truncated_key
-        else
-          key
-        end
+        # Alias for backward compatibility and clarity in acquire/release calls
+        normalize_lock_name(key)
       end
 
       def log_dispatch_attempt(key)

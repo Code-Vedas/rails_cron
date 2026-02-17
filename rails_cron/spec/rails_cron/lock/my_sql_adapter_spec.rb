@@ -71,7 +71,7 @@ RSpec.describe RailsCron::Lock::MySQLAdapter do
       )
     end
 
-    it 'truncates lock names longer than 64 characters' do
+    it 'shortens lock names longer than 64 characters using hash-based approach' do
       long_key = 'a' * 100
       result_set = [{ 'lock_result' => 1 }]
       allow(mock_connection).to receive(:execute).and_return(result_set)
@@ -79,7 +79,10 @@ RSpec.describe RailsCron::Lock::MySQLAdapter do
 
       adapter.acquire(long_key, 60)
 
-      expect(Rails.logger).to have_received(:warn)
+      expect(Rails.logger).to have_received(:warn) do |message|
+        expect(message).to include('hash-based shortening')
+        expect(message).to include('avoid collisions')
+      end
     end
 
     it 'raises LockAdapterError on database failure' do
@@ -176,7 +179,7 @@ RSpec.describe RailsCron::Lock::MySQLAdapter do
       )
     end
 
-    it 'truncates lock names longer than 64 characters' do
+    it 'shortens lock names longer than 64 characters using hash-based approach' do
       long_key = 'b' * 100
       result_set = [{ 'lock_result' => 1 }]
       allow(mock_connection).to receive(:execute).and_return(result_set)
@@ -184,7 +187,10 @@ RSpec.describe RailsCron::Lock::MySQLAdapter do
 
       adapter.release(long_key)
 
-      expect(Rails.logger).to have_received(:warn)
+      expect(Rails.logger).to have_received(:warn) do |message|
+        expect(message).to include('hash-based shortening')
+        expect(message).to include('avoid collisions')
+      end
     end
 
     it 'raises LockAdapterError on database failure' do
@@ -276,7 +282,7 @@ RSpec.describe RailsCron::Lock::MySQLAdapter do
       end.not_to raise_error
     end
 
-    it 'truncates and warns for lock names exceeding 64 characters' do
+    it 'uses hash-based shortening for lock names exceeding 64 characters' do
       key = 'a' * 65
       result_set = [{ 'lock_result' => 1 }]
       allow(mock_connection).to receive(:execute).and_return(result_set)
@@ -285,10 +291,23 @@ RSpec.describe RailsCron::Lock::MySQLAdapter do
       adapter.acquire(key, 60)
 
       expect(Rails.logger).to have_received(:warn) do |message|
-        expect(message).to include('Lock key')
         expect(message).to include('exceeds MySQL named lock limit')
-        expect(message).to include('64')
+        expect(message).to include('hash-based shortening')
       end
+    end
+
+    it 'normalizes long keys to exactly 64 characters' do
+      long_key = 'very_long_key_' * 10 # ~140 chars
+      normalized = adapter.send(:normalize_lock_name, long_key)
+      expect(normalized.length).to eq(64)
+    end
+
+    it 'produces different normalized keys for distinct long keys' do
+      key1 = 'a' * 100
+      key2 = "#{'a' * 99}b"
+      normalized1 = adapter.send(:normalize_lock_name, key1)
+      normalized2 = adapter.send(:normalize_lock_name, key2)
+      expect(normalized1).not_to eq(normalized2)
     end
   end
 
