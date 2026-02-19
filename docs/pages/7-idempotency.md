@@ -70,9 +70,13 @@ RailsCron.register(
 Use Redis directly for faster deduplication with custom TTL:
 
 ```ruby
+# At the top level (e.g., in an initializer)
+REDIS_POOL = ConnectionPool.new(size: 5) { Redis.new(url: ENV['REDIS_URL']) }
+
 RailsCron.configure do |config|
-  redis = Redis.new(url: ENV['REDIS_URL'])
-  config.lock_adapter = RailsCron::Lock::RedisAdapter.new(redis)
+  config.lock_adapter = RailsCron::Lock::RedisAdapter.new(
+    REDIS_POOL.with { |redis| redis }
+  )
   # Note: enable_log_dispatch_registry can be false - deduplication happens in Redis
 end
 
@@ -80,13 +84,13 @@ RailsCron.register(
   key: 'sync:data',
   cron: '*/30 * * * *',
   enqueue: ->(fire_time:, idempotency_key:) {
-    # Use Redis for deduplication
-    redis = Redis.new(url: ENV['REDIS_URL'])
-    redis_key = "railscron:dedup:#{idempotency_key}"
-    
-    unless redis.exists?(redis_key)
-      redis.setex(redis_key, 24.hours.to_i, true)
-      DataSyncJob.perform_later(fire_time: fire_time, idempotency_key: idempotency_key)
+    # In the enqueue callback
+    REDIS_POOL.with do |redis|
+      redis_key = "railscron:dedup:#{idempotency_key}"
+      unless redis.exists?(redis_key)
+        redis.setex(redis_key, 24.hours.to_i, true)
+        DataSyncJob.perform_later(fire_time: fire_time, idempotency_key: idempotency_key)
+      end
     end
   }
 )
@@ -97,6 +101,8 @@ RailsCron.register(
 - Fast in-memory lookups with Redis
 - Custom TTL windows per job type
 - Works across multiple app instances
+- Connection pooling for production efficiency
+- No per-dispatch connection overhead
 
 ---
 
@@ -203,10 +209,6 @@ RailsCron.register(
 
 ---
 
----
-
----
-
 ## Best Practices
 
 ✅ **DO:**
@@ -277,6 +279,9 @@ end
 # Example: Memory adapter (development/testing only)
 RailsCron.configure do |config|
   config.lock_adapter = RailsCron::Lock::MemoryAdapter.new
+  config.enable_log_dispatch_registry = true
+end
+```
 
 #### All jobs showing as duplicate
 
