@@ -284,7 +284,10 @@ module RailsCron
       adapter = configuration.lock_adapter
       return false if adapter.nil? || !adapter.respond_to?(:dispatch_registry)
 
-      adapter.dispatch_registry.dispatched?(key, fire_time)
+      registry = adapter.dispatch_registry
+      return false if registry.nil?
+
+      registry.dispatched?(key, fire_time)
     rescue StandardError => e
       configuration.logger&.warn("Error checking dispatch status for #{key}: #{e.message}")
       false
@@ -336,7 +339,10 @@ module RailsCron
       adapter = configuration.lock_adapter
       return nil if adapter.nil? || !adapter.respond_to?(:dispatch_registry)
 
-      adapter.dispatch_registry
+      registry = adapter.dispatch_registry
+      return nil if registry.nil?
+
+      registry
     rescue StandardError => e
       configuration.logger&.warn("Error accessing dispatch registry: #{e.message}")
       nil

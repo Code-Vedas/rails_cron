@@ -540,6 +540,14 @@ RSpec.describe RailsCron do
       expect(result).to be_nil
     end
 
+    it 'returns nil when dispatch_registry returns nil' do
+      adapter = instance_double(RailsCron::Lock::MemoryAdapter, dispatch_registry: nil)
+      described_class.configuration.lock_adapter = adapter
+
+      result = described_class.dispatch_log_registry
+      expect(result).to be_nil
+    end
+
     it 'returns the dispatch_registry from the adapter' do
       registry = instance_double(RailsCron::Dispatch::Registry)
       adapter = instance_double(RailsCron::Lock::MemoryAdapter, dispatch_registry: registry)
