@@ -380,8 +380,8 @@ module RailsCron
     end
 
     def generate_idempotency_key(cron_key, fire_time)
-      namespace = @configuration.namespace || 'railscron'
-      "#{namespace}-#{cron_key}-#{fire_time.to_i}"
+      generator = RailsCron::IdempotencyKeyGenerator.new(configuration: @configuration)
+      generator.call(cron_key, fire_time)
     end
 
     def generate_lock_key(cron_key, fire_time)

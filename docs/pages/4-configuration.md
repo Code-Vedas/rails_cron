@@ -78,8 +78,8 @@ end
 
 ```ruby
 RailsCron.configure do |c|
-  c.lock_adapter = RailsCron::Lock::Redis.new(
-    url: ENV.fetch("REDIS_URL", "redis://127.0.0.1:6379/0")
+  c.lock_adapter = RailsCron::Lock::RedisAdapter.new(
+    Redis.new(url: ENV.fetch("REDIS_URL", "redis://127.0.0.1:6379/0"))
   )
 end
 ```
@@ -93,9 +93,7 @@ end
 
 ```ruby
 RailsCron.configure do |c|
-  c.lock_adapter = RailsCron::Lock::Postgres.new(
-    connection: ActiveRecord::Base.connection
-  )
+  c.lock_adapter = RailsCron::Lock::PostgresAdapter.new
 end
 ```
 
@@ -108,7 +106,7 @@ end
 
 ```ruby
 RailsCron.configure do |c|
-  c.lock_adapter = RailsCron::Lock::Memory.new
+  c.lock_adapter = RailsCron::Lock::MemoryAdapter.new
 end
 ```
 

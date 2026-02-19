@@ -21,7 +21,7 @@ RailsCron.configure do |config|
   config.enable_log_dispatch_registry = true
   
   # Choose your backend (determines storage and available methods)
-  config.lock_adapter = RailsCron::Lock::Postgres.new(url: ENV['DATABASE_URL'])
+  config.lock_adapter = RailsCron::Lock::PostgresAdapter.new
 end
 ```
 
@@ -75,7 +75,7 @@ already_dispatched = registry.dispatched?('reports:daily', Time.current)
 
 ## Database Backend API
 
-When using `RailsCron::Lock::Postgres`, `RailsCron::Lock::MySQL`, or `RailsCron::Lock::SQLite` adapters, the dispatch registry provides advanced querying:
+When using `RailsCron::Lock::PostgresAdapter`, `RailsCron::Lock::MySQLAdapter`, or `RailsCron::Lock::SQLiteAdapter` adapters, the dispatch registry provides advanced querying:
 
 ### `find_by_key(key)`
 
@@ -104,7 +104,7 @@ records = registry.find_by_node('web-worker-1')
 # Most recent first
 
 # Filter by status
-records.failed = registry.find_by_node('web-worker-1').where(status: 'failed')
+failed = registry.find_by_node('web-worker-1').where(status: 'failed')
 ```
 
 ### `find_by_status(status)`
@@ -140,7 +140,7 @@ registry.cleanup  # Deletes records older than 86400 seconds
 
 ## Memory Backend API
 
-When using `RailsCron::Lock::Memory` adapter, the registry provides in-memory inspection:
+When using `RailsCron::Lock::MemoryAdapter` adapter, the registry provides in-memory inspection:
 
 ### `clear()`
 
@@ -167,15 +167,13 @@ puts "#{count} dispatch records in memory"
 
 ## Redis Backend
 
-When using `RailsCron::Lock::Redis` adapter, dispatch records are automatically expired based on TTL:
+When using `RailsCron::Lock::RedisAdapter` adapter, dispatch records are automatically expired based on TTL:
 
 ```ruby
 # config/initializers/rails_cron.rb
+redis = Redis.new(url: ENV['REDIS_URL'])
 RailsCron.configure do |config|
-  config.lock_adapter = RailsCron::Lock::Redis.new(
-    url: ENV['REDIS_URL'],
-    namespace: 'myapp'
-  )
+  config.lock_adapter = RailsCron::Lock::RedisAdapter.new(redis, namespace: 'myapp')
   config.enable_log_dispatch_registry = true
 end
 

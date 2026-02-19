@@ -480,6 +480,48 @@ RSpec.describe RailsCron do
       result = described_class.dispatched?('test:job', fire_time)
       expect(result).to be(false)
     end
+
+    it 'returns false and logs when adapter.dispatch_registry raises' do
+      logger = instance_double(Logger, warn: nil)
+      adapter = instance_double(RailsCron::Lock::MemoryAdapter, respond_to?: true)
+      fire_time = Time.current
+
+      allow(adapter).to receive(:dispatch_registry).and_raise(StandardError, 'backend error')
+      described_class.configuration.lock_adapter = adapter
+      described_class.configuration.logger = logger
+
+      result = described_class.dispatched?('test:job', fire_time)
+      expect(result).to be(false)
+      expect(logger).to have_received(:warn).with(/Error checking dispatch status for test:job: backend error/)
+    end
+
+    it 'returns false and logs when registry.dispatched? raises' do
+      logger = instance_double(Logger, warn: nil)
+      registry = instance_double(RailsCron::Dispatch::Registry)
+      adapter = instance_double(RailsCron::Lock::MemoryAdapter, dispatch_registry: registry)
+      fire_time = Time.current
+
+      allow(registry).to receive(:dispatched?).and_raise(StandardError, 'database error')
+      described_class.configuration.lock_adapter = adapter
+      described_class.configuration.logger = logger
+
+      result = described_class.dispatched?('test:job', fire_time)
+      expect(result).to be(false)
+      expect(logger).to have_received(:warn).with(/Error checking dispatch status for test:job: database error/)
+    end
+
+    it 'returns false when logger is nil' do
+      registry = instance_double(RailsCron::Dispatch::Registry)
+      adapter = instance_double(RailsCron::Lock::MemoryAdapter, dispatch_registry: registry)
+      fire_time = Time.current
+
+      allow(registry).to receive(:dispatched?).and_raise(StandardError, 'error')
+      described_class.configuration.lock_adapter = adapter
+      described_class.configuration.logger = nil
+
+      result = described_class.dispatched?('test:job', fire_time)
+      expect(result).to be(false)
+    end
   end
 
   describe '.dispatch_log_registry' do
@@ -505,6 +547,30 @@ RSpec.describe RailsCron do
 
       result = described_class.dispatch_log_registry
       expect(result).to eq(registry)
+    end
+
+    it 'returns nil and logs when adapter.dispatch_registry raises' do
+      logger = instance_double(Logger, warn: nil)
+      adapter = instance_double(RailsCron::Lock::MemoryAdapter, respond_to?: true)
+
+      allow(adapter).to receive(:dispatch_registry).and_raise(StandardError, 'backend error')
+      described_class.configuration.lock_adapter = adapter
+      described_class.configuration.logger = logger
+
+      result = described_class.dispatch_log_registry
+      expect(result).to be_nil
+      expect(logger).to have_received(:warn).with(/Error accessing dispatch registry: backend error/)
+    end
+
+    it 'returns nil when logger is nil' do
+      adapter = instance_double(RailsCron::Lock::MemoryAdapter, respond_to?: true)
+
+      allow(adapter).to receive(:dispatch_registry).and_raise(StandardError, 'database error')
+      described_class.configuration.lock_adapter = adapter
+      described_class.configuration.logger = nil
+
+      result = described_class.dispatch_log_registry
+      expect(result).to be_nil
     end
   end
 end

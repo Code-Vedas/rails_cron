@@ -18,6 +18,7 @@ require 'rails_cron/lock/redis_adapter'
 require 'rails_cron/lock/postgres_adapter'
 require 'rails_cron/lock/mysql_adapter'
 require 'rails_cron/lock/sqlite_adapter'
+require 'rails_cron/idempotency_key_generator'
 require 'rails_cron/coordinator'
 require 'rails_cron/railtie'
 
@@ -28,7 +29,7 @@ require 'rails_cron/railtie'
 # @example Configure RailsCron
 #   RailsCron.configure do |config|
 #     config.tick_interval = 5
-#     config.lock_adapter = RailsCron::Lock::Redis.new(url: ENV["REDIS_URL"])
+#     config.lock_adapter = RailsCron::Lock::RedisAdapter.new(Redis.new(url: ENV["REDIS_URL"]))
 #   end
 #
 # @example Register a cron job
@@ -257,8 +258,8 @@ module RailsCron
     #     MyJob.perform_later(key: idempotency_key)
     #   end
     def with_idempotency(key, fire_time)
-      namespace = configuration.namespace || 'railscron'
-      idempotency_key = "#{namespace}-#{key}-#{fire_time.to_i}"
+      generator = IdempotencyKeyGenerator.new(configuration: configuration)
+      idempotency_key = generator.call(key, fire_time)
       yield(idempotency_key)
     end
 
@@ -269,9 +270,12 @@ module RailsCron
     # Returns true if dispatch logging is enabled and the job was previously dispatched,
     # returns false if not found or dispatch logging is disabled.
     #
+    # Safe to call from enqueue callbacks - will return false on any error (e.g., backend
+    # misconfiguration or temporary failure), log via configuration.logger, and never raise.
+    #
     # @param key [String] the cron job key
     # @param fire_time [Time] the fire time to check
-    # @return [Boolean] true if dispatch exists, false otherwise
+    # @return [Boolean] true if dispatch exists, false otherwise (never raises)
     #
     # @example
     #   RailsCron.dispatched?('reports:daily', Time.current)
@@ -280,8 +284,10 @@ module RailsCron
       adapter = configuration.lock_adapter
       return false if adapter.nil? || !adapter.respond_to?(:dispatch_registry)
 
-      registry = adapter.dispatch_registry
-      registry&.dispatched?(key, fire_time) || false
+      adapter.dispatch_registry.dispatched?(key, fire_time)
+    rescue StandardError => e
+      configuration.logger&.warn("Error checking dispatch status for #{key}: #{e.message}")
+      false
     end
 
     ##
@@ -307,7 +313,10 @@ module RailsCron
     # - `clear()` - Clear all stored records
     # - `size()` - Get count of stored records
     #
-    # @return [Dispatch::Registry, nil] the dispatch registry instance, or nil if adapter doesn't support it
+    # Safe for production diagnostics - will return nil on any error (e.g., backend
+    # misconfiguration or temporary failure), log via configuration.logger, and never raise.
+    #
+    # @return [Dispatch::Registry, nil] the dispatch registry instance, or nil if adapter doesn't support it or on error
     #
     # @example Query dispatches with database adapter
     #   registry = RailsCron.dispatch_log_registry
@@ -328,6 +337,9 @@ module RailsCron
       return nil if adapter.nil? || !adapter.respond_to?(:dispatch_registry)
 
       adapter.dispatch_registry
+    rescue StandardError => e
+      configuration.logger&.warn("Error accessing dispatch registry: #{e.message}")
+      nil
     end
 
     ##

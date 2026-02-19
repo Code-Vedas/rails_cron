@@ -1,7 +1,7 @@
 ---
 title: Idempotency & Best Practices
 nav_order: 7
-permalink: /idempotency
+permalink: /idempotency-best-practices
 ---
 
 # 🔐 Idempotency & Job Deduplication
@@ -71,7 +71,8 @@ Use Redis directly for faster deduplication with custom TTL:
 
 ```ruby
 RailsCron.configure do |config|
-  config.lock_adapter = RailsCron::Lock::Redis.new(url: ENV['REDIS_URL'])
+  redis = Redis.new(url: ENV['REDIS_URL'])
+  config.lock_adapter = RailsCron::Lock::RedisAdapter.new(redis)
   # Note: enable_log_dispatch_registry can be false - deduplication happens in Redis
 end
 
@@ -105,7 +106,7 @@ For development and testing, use the memory adapter:
 
 ```ruby
 RailsCron.configure do |config|
-  config.lock_adapter = RailsCron::Lock::Memory.new
+  config.lock_adapter = RailsCron::Lock::MemoryAdapter.new
   config.enable_log_dispatch_registry = true  # Optional: audit trail in-memory
 end
 
@@ -131,7 +132,7 @@ Combine cache checking with dispatch registry for production:
 
 ```ruby
 RailsCron.configure do |config|
-  config.lock_adapter = RailsCron::Lock::Postgres.new(url: ENV['DATABASE_URL'])
+  config.lock_adapter = RailsCron::Lock::PostgresAdapter.new
   config.enable_log_dispatch_registry = true  # Enable audit trail
 end
 
@@ -262,22 +263,20 @@ RailsCron.register(
    ```ruby
    # Example: Database adapter
    RailsCron.configure do |config|
-     config.lock_adapter = RailsCron::Lock::Postgres.new(url: ENV['DATABASE_URL'])
-     config.enable_log_dispatch_registry = true
-   end
-   
-   # Example: Redis adapter
-   RailsCron.configure do |config|
-     config.lock_adapter = RailsCron::Lock::Redis.new(url: ENV['REDIS_URL'])
-     config.enable_log_dispatch_registry = true
-   end
-   
-   # Example: Memory adapter (development/testing only)
-   RailsCron.configure do |config|
-     config.lock_adapter = RailsCron::Lock::Memory.new
-     config.enable_log_dispatch_registry = true
-   end
-   ```
+  config.lock_adapter = RailsCron::Lock::PostgresAdapter.new
+  config.enable_log_dispatch_registry = true
+end
+
+# Example: Redis adapter
+RailsCron.configure do |config|
+  redis = Redis.new(url: ENV['REDIS_URL'])
+  config.lock_adapter = RailsCron::Lock::RedisAdapter.new(redis)
+  config.enable_log_dispatch_registry = true
+end
+
+# Example: Memory adapter (development/testing only)
+RailsCron.configure do |config|
+  config.lock_adapter = RailsCron::Lock::MemoryAdapter.new
 
 #### All jobs showing as duplicate
 
