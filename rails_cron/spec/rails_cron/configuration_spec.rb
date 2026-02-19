@@ -257,6 +257,22 @@ RSpec.describe RailsCron::Configuration do
     it 'includes default time_zone' do
       expect(config.to_h[:time_zone]).to be_nil
     end
+
+    it 'includes default enable_dispatch_recovery' do
+      expect(config.to_h[:enable_dispatch_recovery]).to be true
+    end
+
+    it 'includes default recovery_window' do
+      expect(config.to_h[:recovery_window]).to eq(86_400)
+    end
+
+    it 'includes default recovery_startup_jitter' do
+      expect(config.to_h[:recovery_startup_jitter]).to eq(5)
+    end
+
+    it 'includes enable_log_dispatch_registry' do
+      expect(config.to_h[:enable_log_dispatch_registry]).to be false
+    end
   end
 
   describe 'DEFAULTS' do

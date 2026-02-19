@@ -97,7 +97,10 @@ module RailsCron
         lock_adapter: lock_adapter&.class&.name,
         logger: logger&.class&.name,
         time_zone: @values[:time_zone],
-        enable_log_dispatch_registry: @values[:enable_log_dispatch_registry]
+        enable_log_dispatch_registry: @values[:enable_log_dispatch_registry],
+        enable_dispatch_recovery: @values[:enable_dispatch_recovery],
+        recovery_window: @values[:recovery_window],
+        recovery_startup_jitter: @values[:recovery_startup_jitter]
       }
     end
 
