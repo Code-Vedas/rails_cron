@@ -30,7 +30,9 @@ This deterministic format ensures that:
 - Different fire times generate different keys
 - Keys are suitable for use as deduplication identifiers
 
-**Note on Timezones:** The `fire_time` object is created in your application's configured timezone (set via `Time.zone` in Rails). The idempotency key uses `fire_time.to_i` which converts to a Unix timestamp—a timezone-agnostic representation—ensuring consistent key generation regardless of timezone configuration. However, if you manually create `fire_time` objects for manual idempotency checking, ensure they're created with `Time.current` (which respects your app's timezone) rather than `Time.now` (which uses system timezone).
+**Note on Timezones:** The `fire_time` object is created in your application's configured timezone (set via `Time.zone` in Rails).
+The idempotency key uses `fire_time.to_i` which converts to a Unix timestamp—a timezone-agnostic representation—ensuring consistent key generation regardless of timezone configuration.
+However, if you manually create `fire_time` objects for manual idempotency checking, ensure they're created with `Time.current` (which respects your app's timezone) rather than `Time.now` (which uses system timezone).
 
 ---
 
@@ -118,6 +120,7 @@ RailsCron.register(
 **How it Works:**
 
 The `ConnectionPool` object delegates all method calls (like `:set`, `:eval`, `:exists?`) to its underlying Redis instances. When the adapter or dispatch registry code calls a method on the pool, it:
+
 1. Checks out a connection from the pool
 2. Executes the method on that connection
 3. Returns the connection to the pool for reuse
@@ -323,7 +326,7 @@ Use `RailsCron.dispatched?` to check if a job has been dispatched:
   end
 ```
 
-## All jobs showing as duplicate
+#### All jobs showing as duplicate
 
 1. Verify dispatch logging is enabled and configured correctly:
 
