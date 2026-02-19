@@ -45,6 +45,8 @@ detectors:
       - RailsCron::Registry#validate_entry
       - RailsCron::Coordinator#already_dispatched?
       - RailsCron::Coordinator#cleanup_old_dispatch_records
+      - RailsCron#dispatch_log_registry
+      - RailsCron#dispatched?
   UtilityFunction:
     enabled: true
     exclude:
@@ -79,6 +81,8 @@ detectors:
       - RailsCron::Lock::MySQLAdapter#cast_to_boolean
       - RailsCron::Coordinator#already_dispatched?
       - RailsCron::Coordinator#cleanup_old_dispatch_records
+      - RailsCron#dispatch_log_registry
+      - RailsCron#dispatched?
 
 exclude_paths:
   - spec/**/*

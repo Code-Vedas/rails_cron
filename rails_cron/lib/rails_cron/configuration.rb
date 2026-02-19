@@ -13,7 +13,7 @@ module RailsCron
   # @example Basic configuration
   #   RailsCron.configure do |config|
   #     config.tick_interval = 5
-  #     config.lock_adapter = RailsCron::Lock::Redis.new(url: ENV["REDIS_URL"])
+  #     config.lock_adapter = RailsCron::Lock::RedisAdapter.new(Redis.new(url: ENV["REDIS_URL"]))
   #   end
   class Configuration
     # Default values for all configuration options

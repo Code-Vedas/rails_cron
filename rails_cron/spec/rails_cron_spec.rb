@@ -337,4 +337,256 @@ RSpec.describe RailsCron do
       expect(described_class.running?).to be(false)
     end
   end
+
+  describe '.with_idempotency' do
+    it 'generates an idempotency key with default namespace' do
+      fire_time = Time.at(1_234_567_890)
+      result = described_class.with_idempotency('reports:daily', fire_time) do |idempotency_key|
+        idempotency_key
+      end
+
+      expect(result).to eq('railscron-reports:daily-1234567890')
+    end
+
+    it 'generates an idempotency key with custom namespace' do
+      described_class.configure do |config|
+        config.namespace = 'myapp'
+      end
+
+      fire_time = Time.at(1_234_567_890)
+      result = described_class.with_idempotency('reports:daily', fire_time) do |idempotency_key|
+        idempotency_key
+      end
+
+      expect(result).to eq('myapp-reports:daily-1234567890')
+    end
+
+    it 'yields the idempotency key to the block' do
+      fire_time = Time.current
+      yielded_key = nil
+
+      described_class.with_idempotency('test:job', fire_time) do |key|
+        yielded_key = key
+      end
+
+      expect(yielded_key).to match(/^railscron-test:job-\d+$/)
+    end
+
+    it 'returns the result of the block' do
+      fire_time = Time.current
+      result = described_class.with_idempotency('sync:data', fire_time) do |_key|
+        'custom_result'
+      end
+
+      expect(result).to eq('custom_result')
+    end
+
+    it 'handles complex cron keys with multiple colons' do
+      described_class.configure do |config|
+        config.namespace = 'custom'
+      end
+
+      fire_time = Time.at(1_609_459_200)
+      result = described_class.with_idempotency('reports:weekly:summary', fire_time) do |key|
+        key
+      end
+
+      expect(result).to eq('custom-reports:weekly:summary-1609459200')
+    end
+
+    it 'generates deterministic keys for the same inputs' do
+      fire_time = Time.at(1_234_567_890)
+
+      key1 = described_class.with_idempotency('reports:daily', fire_time) { |k| k }
+      key2 = described_class.with_idempotency('reports:daily', fire_time) { |k| k }
+
+      expect(key1).to eq(key2)
+    end
+
+    it 'generates different keys for different cron keys' do
+      fire_time = Time.at(1_234_567_890)
+
+      key1 = described_class.with_idempotency('reports:daily', fire_time) { |k| k }
+      key2 = described_class.with_idempotency('reports:weekly', fire_time) { |k| k }
+
+      expect(key1).not_to eq(key2)
+    end
+
+    it 'generates different keys for different fire times' do
+      key1 = described_class.with_idempotency('reports:daily', Time.at(1_234_567_890)) { |k| k }
+      key2 = described_class.with_idempotency('reports:daily', Time.at(1_234_567_891)) { |k| k }
+
+      expect(key1).not_to eq(key2)
+    end
+
+    it 'allows the block to perform operations with the idempotency key' do
+      fire_time = Time.current
+      operations = []
+
+      described_class.with_idempotency('test:job', fire_time) do |idempotency_key|
+        operations << idempotency_key
+        operations << 'processed'
+      end
+
+      expect(operations).to include(an_instance_of(String))
+      expect(operations).to include('processed')
+    end
+
+    it 'raises ArgumentError when called without a block' do
+      fire_time = Time.current
+
+      expect do
+        described_class.with_idempotency('test:job', fire_time)
+      end.to raise_error(ArgumentError, 'block required')
+    end
+  end
+
+  describe '.dispatched?' do
+    it 'returns false when adapter is nil' do
+      described_class.configuration.lock_adapter = nil
+
+      result = described_class.dispatched?('test:job', Time.current)
+      expect(result).to be(false)
+    end
+
+    it 'returns false when adapter does not have dispatch_registry' do
+      adapter = instance_double(RailsCron::Lock::MemoryAdapter, respond_to?: false)
+      described_class.configuration.lock_adapter = adapter
+
+      result = described_class.dispatched?('test:job', Time.current)
+      expect(result).to be(false)
+    end
+
+    it 'returns false when registry returns nil' do
+      adapter = instance_double(RailsCron::Lock::MemoryAdapter, dispatch_registry: nil)
+      described_class.configuration.lock_adapter = adapter
+
+      result = described_class.dispatched?('test:job', Time.current)
+      expect(result).to be(false)
+    end
+
+    it 'returns the result from dispatch_registry.dispatched?' do
+      registry = instance_double(RailsCron::Dispatch::Registry)
+      adapter = instance_double(RailsCron::Lock::MemoryAdapter, dispatch_registry: registry)
+      fire_time = Time.current
+
+      allow(registry).to receive(:dispatched?).with('test:job', fire_time).and_return(true)
+      described_class.configuration.lock_adapter = adapter
+
+      result = described_class.dispatched?('test:job', fire_time)
+      expect(result).to be(true)
+    end
+
+    it 'returns false when registry.dispatched? returns false' do
+      registry = instance_double(RailsCron::Dispatch::Registry)
+      adapter = instance_double(RailsCron::Lock::MemoryAdapter, dispatch_registry: registry)
+      fire_time = Time.current
+
+      allow(registry).to receive(:dispatched?).with('test:job', fire_time).and_return(false)
+      described_class.configuration.lock_adapter = adapter
+
+      result = described_class.dispatched?('test:job', fire_time)
+      expect(result).to be(false)
+    end
+
+    it 'returns false and logs when adapter.dispatch_registry raises' do
+      logger = instance_double(Logger, warn: nil)
+      adapter = instance_double(RailsCron::Lock::MemoryAdapter, respond_to?: true)
+      fire_time = Time.current
+
+      allow(adapter).to receive(:dispatch_registry).and_raise(StandardError, 'backend error')
+      described_class.configuration.lock_adapter = adapter
+      described_class.configuration.logger = logger
+
+      result = described_class.dispatched?('test:job', fire_time)
+      expect(result).to be(false)
+      expect(logger).to have_received(:warn).with(/Error checking dispatch status for test:job: backend error/)
+    end
+
+    it 'returns false and logs when registry.dispatched? raises' do
+      logger = instance_double(Logger, warn: nil)
+      registry = instance_double(RailsCron::Dispatch::Registry)
+      adapter = instance_double(RailsCron::Lock::MemoryAdapter, dispatch_registry: registry)
+      fire_time = Time.current
+
+      allow(registry).to receive(:dispatched?).and_raise(StandardError, 'database error')
+      described_class.configuration.lock_adapter = adapter
+      described_class.configuration.logger = logger
+
+      result = described_class.dispatched?('test:job', fire_time)
+      expect(result).to be(false)
+      expect(logger).to have_received(:warn).with(/Error checking dispatch status for test:job: database error/)
+    end
+
+    it 'returns false when logger is nil' do
+      registry = instance_double(RailsCron::Dispatch::Registry)
+      adapter = instance_double(RailsCron::Lock::MemoryAdapter, dispatch_registry: registry)
+      fire_time = Time.current
+
+      allow(registry).to receive(:dispatched?).and_raise(StandardError, 'error')
+      described_class.configuration.lock_adapter = adapter
+      described_class.configuration.logger = nil
+
+      result = described_class.dispatched?('test:job', fire_time)
+      expect(result).to be(false)
+    end
+  end
+
+  describe '.dispatch_log_registry' do
+    it 'returns nil when adapter is nil' do
+      described_class.configuration.lock_adapter = nil
+
+      result = described_class.dispatch_log_registry
+      expect(result).to be_nil
+    end
+
+    it 'returns nil when adapter does not have dispatch_registry' do
+      adapter = instance_double(RailsCron::Lock::MemoryAdapter, respond_to?: false)
+      described_class.configuration.lock_adapter = adapter
+
+      result = described_class.dispatch_log_registry
+      expect(result).to be_nil
+    end
+
+    it 'returns nil when dispatch_registry returns nil' do
+      adapter = instance_double(RailsCron::Lock::MemoryAdapter, dispatch_registry: nil)
+      described_class.configuration.lock_adapter = adapter
+
+      result = described_class.dispatch_log_registry
+      expect(result).to be_nil
+    end
+
+    it 'returns the dispatch_registry from the adapter' do
+      registry = instance_double(RailsCron::Dispatch::Registry)
+      adapter = instance_double(RailsCron::Lock::MemoryAdapter, dispatch_registry: registry)
+      described_class.configuration.lock_adapter = adapter
+
+      result = described_class.dispatch_log_registry
+      expect(result).to eq(registry)
+    end
+
+    it 'returns nil and logs when adapter.dispatch_registry raises' do
+      logger = instance_double(Logger, warn: nil)
+      adapter = instance_double(RailsCron::Lock::MemoryAdapter, respond_to?: true)
+
+      allow(adapter).to receive(:dispatch_registry).and_raise(StandardError, 'backend error')
+      described_class.configuration.lock_adapter = adapter
+      described_class.configuration.logger = logger
+
+      result = described_class.dispatch_log_registry
+      expect(result).to be_nil
+      expect(logger).to have_received(:warn).with(/Error accessing dispatch registry: backend error/)
+    end
+
+    it 'returns nil when logger is nil' do
+      adapter = instance_double(RailsCron::Lock::MemoryAdapter, respond_to?: true)
+
+      allow(adapter).to receive(:dispatch_registry).and_raise(StandardError, 'database error')
+      described_class.configuration.lock_adapter = adapter
+      described_class.configuration.logger = nil
+
+      result = described_class.dispatch_log_registry
+      expect(result).to be_nil
+    end
+  end
 end

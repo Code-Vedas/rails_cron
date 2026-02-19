@@ -46,10 +46,10 @@ Example:
 RailsCron.configure do |c|
   # Choose your distributed lock adapter
   # Redis (recommended)
-  # c.lock_adapter = RailsCron::Lock::Redis.new(url: ENV.fetch("REDIS_URL"))
+  # c.lock_adapter = RailsCron::Lock::RedisAdapter.new(Redis.new(url: ENV.fetch("REDIS_URL")))
 
   # or Postgres advisory locks
-  # c.lock_adapter = RailsCron::Lock::Postgres.new(connection: ActiveRecord::Base.connection)
+  # c.lock_adapter = RailsCron::Lock::PostgresAdapter.new
 
   # Frequency of scheduler ticks (seconds)
   c.tick_interval    = 5

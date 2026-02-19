@@ -41,11 +41,11 @@ RailsCron.configure do |c|
 
   # Optional logger override
   # c.logger = Logger.new($stdout, level: :info)
-  
+
   # Missed-run recovery (enabled by default)
   # c.enable_dispatch_recovery = true
   # c.recovery_window = 86_400 # 24 hours
-  
+
   # Dispatch logging for audit trail and efficient recovery
   # c.enable_log_dispatch_registry = true
 end
@@ -55,20 +55,20 @@ end
 
 ## 🔧 Configuration Reference
 
-| Setting            | Type    | Default                     | Description                                                                                |
-| ------------------ | ------- | --------------------------- | ------------------------------------------------------------------------------------------ |
-| `lock_adapter`     | Object  | `nil`                       | Distributed lock implementation. Use **Redis** or **Postgres** in multi-node environments. |
-| `tick_interval`    | Integer | `5`                         | Seconds between scheduler ticks.                                                           |
-| `window_lookback`  | Integer | `120`                       | How far back the scheduler will replay missed ticks.                                       |
-| `window_lookahead` | Integer | `0`                         | How far ahead to pre-trigger upcoming ticks (optional).                                    |
-| `lease_ttl`        | Integer | `60`                        | Duration for distributed lock lease in seconds.                                            |
-| `namespace`        | String  | `"railscron"`               | Key prefix used for locks and dispatch logs.                                               |
-| `logger`           | Logger  | `Rails.logger` (if present) | Logger used for scheduler messages.                                                        |
-| `time_zone`        | String  | System default              | Optional timezone for evaluating cron expressions.                                         |
-| `enable_log_dispatch_registry` | Boolean | `false`          | Enable dispatch logging for audit trail and recovery.                                      |
-| `enable_dispatch_recovery` | Boolean | `true`                  | Automatically recover missed runs after downtime.                                          |
-| `recovery_window`  | Integer | `86400` (24 hours)          | How far back to look for missed runs during recovery (in seconds).                         |
-| `recovery_startup_jitter` | Integer | `5`                  | Max random delay (seconds) before recovery to reduce lock contention on cluster restarts.  |
+| Setting                        | Type    | Default                     | Description                                                                                |
+| ------------------------------ | ------- | --------------------------- | ------------------------------------------------------------------------------------------ |
+| `lock_adapter`                 | Object  | `nil`                       | Distributed lock implementation. Use **Redis** or **Postgres** in multi-node environments. |
+| `tick_interval`                | Integer | `5`                         | Seconds between scheduler ticks.                                                           |
+| `window_lookback`              | Integer | `120`                       | How far back the scheduler will replay missed ticks.                                       |
+| `window_lookahead`             | Integer | `0`                         | How far ahead to pre-trigger upcoming ticks (optional).                                    |
+| `lease_ttl`                    | Integer | `60`                        | Duration for distributed lock lease in seconds.                                            |
+| `namespace`                    | String  | `"railscron"`               | Key prefix used for locks and dispatch logs.                                               |
+| `logger`                       | Logger  | `Rails.logger` (if present) | Logger used for scheduler messages.                                                        |
+| `time_zone`                    | String  | System default              | Optional timezone for evaluating cron expressions.                                         |
+| `enable_log_dispatch_registry` | Boolean | `false`                     | Enable dispatch logging for audit trail and recovery.                                      |
+| `enable_dispatch_recovery`     | Boolean | `true`                      | Automatically recover missed runs after downtime.                                          |
+| `recovery_window`              | Integer | `86400` (24 hours)          | How far back to look for missed runs during recovery (in seconds).                         |
+| `recovery_startup_jitter`      | Integer | `5`                         | Max random delay (seconds) before recovery to reduce lock contention on cluster restarts.  |
 
 ---
 
@@ -78,8 +78,8 @@ end
 
 ```ruby
 RailsCron.configure do |c|
-  c.lock_adapter = RailsCron::Lock::Redis.new(
-    url: ENV.fetch("REDIS_URL", "redis://127.0.0.1:6379/0")
+  c.lock_adapter = RailsCron::Lock::RedisAdapter.new(
+    Redis.new(url: ENV.fetch("REDIS_URL", "redis://127.0.0.1:6379/0"))
   )
 end
 ```
@@ -93,9 +93,7 @@ end
 
 ```ruby
 RailsCron.configure do |c|
-  c.lock_adapter = RailsCron::Lock::Postgres.new(
-    connection: ActiveRecord::Base.connection
-  )
+  c.lock_adapter = RailsCron::Lock::PostgresAdapter.new
 end
 ```
 
@@ -108,7 +106,7 @@ end
 
 ```ruby
 RailsCron.configure do |c|
-  c.lock_adapter = RailsCron::Lock::Memory.new
+  c.lock_adapter = RailsCron::Lock::MemoryAdapter.new
 end
 ```
 
@@ -215,13 +213,13 @@ end
 RailsCron.configure do |c|
   # Enable automatic recovery (default: true)
   c.enable_dispatch_recovery = true
-  
+
   # How far back to look for missed runs (default: 24 hours)
   c.recovery_window = 86_400 # in seconds
-  
+
   # Random delay before recovery to reduce contention (default: 5 seconds)
   c.recovery_startup_jitter = 5
-  
+
   # Enable dispatch logging for efficient recovery (default: false)
   c.enable_log_dispatch_registry = true
 end
@@ -229,12 +227,12 @@ end
 
 ### Recovery Options
 
-| Setting                       | Type    | Default   | Description                                                                                     |
-| ----------------------------- | ------- | --------- | ----------------------------------------------------------------------------------------------- |
-| `enable_dispatch_recovery`    | Boolean | `true`    | Automatically recover missed runs on startup.                                                   |
-| `recovery_window`             | Integer | `86400`   | How far back to look for missed runs (in seconds). 24 hours covers typical overnight downtimes. |
-| `recovery_startup_jitter`     | Integer | `5`       | Max random delay (0-N seconds) before recovery starts. Reduces lock contention on cluster restarts. |
-| `enable_log_dispatch_registry`| Boolean | `false`   | When enabled, recovery checks dispatch log first to avoid re-enqueueing already-executed jobs.  |
+| Setting                        | Type    | Default | Description                                                                                         |
+| ------------------------------ | ------- | ------- | --------------------------------------------------------------------------------------------------- |
+| `enable_dispatch_recovery`     | Boolean | `true`  | Automatically recover missed runs on startup.                                                       |
+| `recovery_window`              | Integer | `86400` | How far back to look for missed runs (in seconds). 24 hours covers typical overnight downtimes.     |
+| `recovery_startup_jitter`      | Integer | `5`     | Max random delay (0-N seconds) before recovery starts. Reduces lock contention on cluster restarts. |
+| `enable_log_dispatch_registry` | Boolean | `false` | When enabled, recovery checks dispatch log first to avoid re-enqueueing already-executed jobs.      |
 
 ### Interaction with Dispatch Logging
 
@@ -249,27 +247,32 @@ end
 ```
 
 **Benefits:**
+
 - **Efficient Recovery**: The dispatch log is checked first, avoiding unnecessary lock attempts for already-executed jobs
 - **Audit Trail**: See exactly which jobs were recovered vs. which were already executed
 - **Reduced Contention**: Fewer lock acquisition attempts = less load on your lock adapter
 
 **Without Dispatch Logging:**
+
 - Recovery still works but relies solely on distributed locks to prevent duplicates
 - Each missed run will attempt to acquire a lock (even if it was already dispatched)
 - Still safe, but may cause more lock contention during recovery
 
 ### Example Scenarios
 
-**Scenario 1: Short Downtime (< window_lookback)**
+#### Scenario 1: Short Downtime (< window_lookback)
+
 - Normal `window_lookback` (120 seconds) handles this automatically
 - No special recovery needed
 
-**Scenario 2: Extended Downtime (hours/days)**
+#### Scenario 2: Extended Downtime (hours/days)
+
 - Recovery kicks in on startup
 - Looks back 24 hours (default `recovery_window`)
 - Re-enqueues all missed runs that should have occurred
 
-**Scenario 3: Cluster Restart**
+#### Scenario 3: Cluster Restart
+
 - All nodes recover simultaneously
 - Random jitter (0-5 seconds) staggers recovery attempts
 - Distributed locks prevent duplicate enqueues
