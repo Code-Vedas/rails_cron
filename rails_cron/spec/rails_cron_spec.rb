@@ -431,6 +431,14 @@ RSpec.describe RailsCron do
       expect(operations).to include(an_instance_of(String))
       expect(operations).to include('processed')
     end
+
+    it 'raises ArgumentError when called without a block' do
+      fire_time = Time.current
+
+      expect do
+        described_class.with_idempotency('test:job', fire_time)
+      end.to raise_error(ArgumentError, 'block required')
+    end
   end
 
   describe '.dispatched?' do

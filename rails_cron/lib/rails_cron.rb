@@ -253,13 +253,16 @@ module RailsCron
     # @yield [String] yields the generated idempotency key
     # @return [Object] the result of the block
     #
+    # @raise [ArgumentError] if no block is provided
+    #
     # @example
     #   RailsCron.with_idempotency('reports:daily', Time.current) do |idempotency_key|
     #     MyJob.perform_later(key: idempotency_key)
     #   end
     def with_idempotency(key, fire_time)
-      generator = IdempotencyKeyGenerator.new(configuration: configuration)
-      idempotency_key = generator.call(key, fire_time)
+      raise ArgumentError, 'block required' unless block_given?
+
+      idempotency_key = IdempotencyKeyGenerator.call(key, fire_time, configuration: configuration)
       yield(idempotency_key)
     end
 
