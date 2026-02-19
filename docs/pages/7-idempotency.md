@@ -95,7 +95,9 @@ RailsCron.register(
     # This ensures connections are properly managed for dispatch registry operations
     REDIS_POOL.with do |redis|
       redis_key = "railscron:dedup:#{idempotency_key}"
-      unless redis.exists?(redis_key)
+      # Use exists (not exists?) for compatibility with redis-rb 4.2.0+
+      # exists returns a boolean, while exists? returns an integer count
+      unless redis.exists(redis_key)
         redis.setex(redis_key, 24.hours.to_i, true)
         DataSyncJob.perform_later(fire_time: fire_time, idempotency_key: idempotency_key)
       end
