@@ -19,7 +19,7 @@ Configure dispatch logging in your Rails initializer:
 RailsCron.configure do |config|
   # Enable audit trail for all cron jobs
   config.enable_log_dispatch_registry = true
-  
+
   # Choose your backend (determines storage and available methods)
   config.lock_adapter = RailsCron::Lock::PostgresAdapter.new
 end
@@ -241,12 +241,12 @@ namespace :rails_cron do
   desc 'Clean up old dispatch records'
   task cleanup_dispatch_log: :environment do
     registry = RailsCron.dispatch_log_registry
-    
+
     if registry.nil?
       puts 'Dispatch logging not configured, skipping cleanup'
       next
     end
-    
+
     # Delete records older than 30 days
     recovery_window = 30 * 24 * 60 * 60
     deleted = registry.cleanup(recovery_window: recovery_window)
@@ -333,20 +333,23 @@ end
 If your dispatch table is very large, consider:
 
 1. **Run cleanup regularly:**
+
    ```ruby
    RailsCron.dispatch_log_registry.cleanup(recovery_window: 7 * 24 * 60 * 60)
    ```
 
 2. **Use indexed queries:**
+
    ```ruby
    # Indexed by key, fire_time
    registry.find_dispatch('mykey', Time.current)
-   
+
    # Slower: full table scan
    RailsCron::CronDispatch.where(status: 'failed')
    ```
 
 3. **Archive old records:**
+
    ```ruby
    # Export records older than 90 days to archive storage
    old = RailsCron::CronDispatch.where('fire_time < ?', 90.days.ago)
