@@ -5,6 +5,8 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 
+require_relative 'dispatch_logging'
+
 module RailsCron
   module Lock
     ##
@@ -21,13 +23,24 @@ module RailsCron
     # @example Using the adapter with any SQL database
     #   RailsCron.configure do |config|
     #     config.lock_adapter = RailsCron::Lock::SQLiteAdapter.new
+    #     config.enable_log_dispatch_registry = true  # Enable dispatch logging
     #   end
     class SQLiteAdapter < Adapter
+      include DispatchLogging
+
       ##
       # Initialize a new database-backed adapter.
       #
       # @return [SQLiteAdapter] a new instance
       #   (Note: Despite the class name, this works with any ActiveRecord SQL database)
+
+      ##
+      # Get the dispatch registry for database logging.
+      #
+      # @return [RailsCron::Dispatch::DatabaseEngine] database engine instance
+      def dispatch_registry
+        @dispatch_registry ||= RailsCron::Dispatch::DatabaseEngine.new
+      end
 
       ##
       # Attempt to acquire a distributed lock in the database.
@@ -43,7 +56,7 @@ module RailsCron
         now = Time.current
         expires_at = now + ttl.seconds
 
-        begin
+        acquired = begin
           # Try to create a new lock record
           RailsCron::CronLock.create!(
             key: key,
@@ -68,6 +81,10 @@ module RailsCron
         rescue StandardError => e
           raise LockAdapterError, "SQLite acquire failed for #{key}: #{e.message}"
         end
+
+        log_dispatch_attempt(key) if acquired
+
+        acquired
       end
 
       ##

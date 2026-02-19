@@ -22,7 +22,11 @@ RSpec.describe RailsCron::Configuration do
       namespace: 'railscron',
       lock_adapter: nil,
       logger: nil,
-      time_zone: nil
+      time_zone: nil,
+      enable_log_dispatch_registry: false,
+      enable_dispatch_recovery: true,
+      recovery_window: 86_400,
+      recovery_startup_jitter: 5
     }
   end
 
@@ -252,6 +256,22 @@ RSpec.describe RailsCron::Configuration do
 
     it 'includes default time_zone' do
       expect(config.to_h[:time_zone]).to be_nil
+    end
+
+    it 'includes default enable_dispatch_recovery' do
+      expect(config.to_h[:enable_dispatch_recovery]).to be true
+    end
+
+    it 'includes default recovery_window' do
+      expect(config.to_h[:recovery_window]).to eq(86_400)
+    end
+
+    it 'includes default recovery_startup_jitter' do
+      expect(config.to_h[:recovery_startup_jitter]).to eq(5)
+    end
+
+    it 'includes enable_log_dispatch_registry' do
+      expect(config.to_h[:enable_log_dispatch_registry]).to be false
     end
   end
 

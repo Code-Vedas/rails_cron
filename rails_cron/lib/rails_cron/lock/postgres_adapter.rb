@@ -27,38 +27,34 @@ module RailsCron
     # - Ensure connection pooling is properly configured to release connections
     #   promptly when processes terminate.
     #
-    # Optionally logs all dispatch attempts to the CronDispatch model for
-    # audit/observability purposes.
+    # Optionally logs all dispatch attempts to the database when
+    # enable_log_dispatch_registry is enabled in configuration.
     #
     # @example Using the PostgreSQL adapter
     #   RailsCron.configure do |config|
     #     config.lock_adapter = RailsCron::Lock::PostgresAdapter.new
-    #   end
-    #
-    # @example With audit logging
-    #   RailsCron.configure do |config|
-    #     config.lock_adapter = RailsCron::Lock::PostgresAdapter.new(log_dispatch: true)
+    #     config.enable_log_dispatch_registry = true  # Enable dispatch logging
     #   end
     class PostgresAdapter < Adapter
       include DispatchLogging
 
-      attr_reader :log_dispatch
-
       ##
       # Initialize a new PostgreSQL adapter.
+
+      ##
+      # Get the dispatch registry for database logging.
       #
-      # @param log_dispatch [Boolean] whether to log dispatch attempts to CronDispatch model (default: false)
-      def initialize(log_dispatch: false)
-        super()
-        @log_dispatch = log_dispatch
+      # @return [RailsCron::Dispatch::DatabaseEngine] database engine instance
+      def dispatch_registry
+        @dispatch_registry ||= RailsCron::Dispatch::DatabaseEngine.new
       end
 
       ##
       # Attempt to acquire a distributed lock using PostgreSQL advisory lock.
       #
       # Converts the lock key to a deterministic 64-bit integer hash and attempts
-      # to acquire the advisory lock. If successful, records the dispatch attempt
-      # if log_dispatch is enabled.
+      # to acquire the advisory lock. If successful, logs the dispatch attempt
+      # when enable_log_dispatch_registry is enabled.
       #
       # **Note:** The +ttl+ parameter is ignored. PostgreSQL advisory locks are
       # connection-based and do not auto-expire. The lock will be held until the
@@ -73,7 +69,7 @@ module RailsCron
         sql = ActiveRecord::Base.sanitize_sql_array(['SELECT pg_try_advisory_lock(?)', lock_id])
         acquired = cast_to_boolean(ActiveRecord::Base.connection.execute(sql).first['pg_try_advisory_lock'])
 
-        log_dispatch_attempt(key) if acquired && @log_dispatch
+        log_dispatch_attempt(key) if acquired
 
         acquired
       rescue StandardError => e

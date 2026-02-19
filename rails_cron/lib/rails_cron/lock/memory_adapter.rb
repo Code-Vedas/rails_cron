@@ -5,6 +5,8 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 
+require_relative 'dispatch_logging'
+
 module RailsCron
   module Lock
     ##
@@ -21,12 +23,23 @@ module RailsCron
     # @example Using the memory adapter
     #   RailsCron.configure do |config|
     #     config.lock_adapter = RailsCron::Lock::MemoryAdapter.new
+    #     config.enable_log_dispatch_registry = true  # Enable dispatch logging
     #   end
     class MemoryAdapter < Adapter
+      include DispatchLogging
+
       def initialize
         super
         @locks = {}
         @mutex = Mutex.new
+      end
+
+      ##
+      # Get the dispatch registry for in-memory logging.
+      #
+      # @return [RailsCron::Dispatch::MemoryEngine] memory engine instance
+      def dispatch_registry
+        @dispatch_registry ||= RailsCron::Dispatch::MemoryEngine.new
       end
 
       ##
@@ -40,15 +53,19 @@ module RailsCron
       # @param ttl [Integer] time-to-live in seconds
       # @return [Boolean] true if acquired (key was free or expired), false if held by another process
       def acquire(key, ttl)
-        @mutex.synchronize do
+        acquired = @mutex.synchronize do
           prune_expired_locks
           expiration_time = @locks[key]
           current_time = Time.current
-          return false if expiration_time && expiration_time > current_time
+          next false if expiration_time && expiration_time > current_time
 
           @locks[key] = current_time + ttl.seconds
           true
         end
+
+        log_dispatch_attempt(key) if acquired
+
+        acquired
       end
 
       ##

@@ -210,11 +210,7 @@ module RailsCron
     def validate_entry(key, cron, enqueue)
       raise ArgumentError, 'key cannot be empty' if key.to_s.strip.empty?
       raise ArgumentError, 'cron cannot be empty' if cron.to_s.strip.empty?
-      raise ArgumentError, 'enqueue must be callable' unless callable?(enqueue)
-    end
-
-    def callable?(enqueue)
-      enqueue.respond_to?(:call)
+      raise ArgumentError, 'enqueue must be callable' unless enqueue.respond_to?(:call)
     end
   end
 

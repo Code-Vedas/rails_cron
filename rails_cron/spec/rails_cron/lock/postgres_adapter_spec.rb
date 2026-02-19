@@ -16,19 +16,17 @@ RSpec.describe RailsCron::Lock::PostgresAdapter do
   end
 
   describe '#initialize' do
-    it 'can be initialized without log_dispatch' do
-      adapter_default = described_class.new
-      expect(adapter_default).to be_a(described_class)
+    it 'can be initialized' do
+      adapter = described_class.new
+      expect(adapter).to be_a(described_class)
     end
 
-    it 'can be initialized with log_dispatch true' do
-      adapter_with_log = described_class.new(log_dispatch: true)
-      expect(adapter_with_log).to be_a(described_class)
+    it 'has a dispatch_registry method' do
+      expect(adapter).to respond_to(:dispatch_registry)
     end
 
-    it 'can be initialized with log_dispatch false' do
-      adapter_without_log = described_class.new(log_dispatch: false)
-      expect(adapter_without_log).to be_a(described_class)
+    it 'returns a DatabaseEngine for dispatch_registry' do
+      expect(adapter.dispatch_registry).to be_a(RailsCron::Dispatch::DatabaseEngine)
     end
   end
 
@@ -96,39 +94,53 @@ RSpec.describe RailsCron::Lock::PostgresAdapter do
       end.to raise_error(RailsCron::Lock::LockAdapterError, /PostgreSQL acquire failed/)
     end
 
-    context 'with log_dispatch enabled' do
-      let(:adapter) { described_class.new(log_dispatch: true) }
+    context 'with dispatch logging enabled' do
+      before do
+        RailsCron.configuration.enable_log_dispatch_registry = true
+      end
 
-      it 'attempts to log dispatch when lock is acquired' do
+      after do
+        RailsCron.configuration.enable_log_dispatch_registry = false
+      end
+
+      it 'logs dispatch when lock is acquired' do
         result_set = [{ 'pg_try_advisory_lock' => true }]
         allow(mock_connection).to receive(:execute).and_return(result_set)
 
-        # Should not raise even if CronDispatch is not defined
+        # Should not raise even if logging occurs
         expect { adapter.acquire('railscron:dispatch:myjob:1609459200', 60) }.not_to raise_error
       end
 
-      it 'raises LockAdapterError if CronDispatch.create! fails' do
+      it 'logs error if dispatch logging fails' do
         result_set = [{ 'pg_try_advisory_lock' => true }]
         allow(mock_connection).to receive(:execute).and_return(result_set)
 
-        # Stub the CronDispatch.create! to raise an error
-        allow(RailsCron::CronDispatch).to receive(:create!).and_raise(StandardError, 'Database connection lost')
+        # Stub the registry to raise an error
+        allow(adapter.dispatch_registry).to receive(:log_dispatch).and_raise(StandardError, 'Database connection lost')
 
-        expect do
-          adapter.acquire('railscron:dispatch:job:1234567890', 60)
-        end.to raise_error(RailsCron::Lock::LockAdapterError, /Failed to log dispatch/)
+        # Mock logger to verify error is logged
+        logger = instance_double(Logger)
+        allow(RailsCron.configuration).to receive(:logger).and_return(logger)
+        allow(logger).to receive(:error)
+
+        expect { adapter.acquire('railscron:dispatch:job:1234567890', 60) }.not_to raise_error
+        expect(logger).to have_received(:error).with(/Failed to log dispatch/)
       end
     end
 
-    context 'with log_dispatch disabled' do
-      let(:adapter) { described_class.new(log_dispatch: false) }
+    context 'with dispatch logging disabled' do
+      before do
+        RailsCron.configuration.enable_log_dispatch_registry = false
+      end
 
       it 'does not attempt to log dispatch' do
         result_set = [{ 'pg_try_advisory_lock' => true }]
         allow(mock_connection).to receive(:execute).and_return(result_set)
+        allow(adapter.dispatch_registry).to receive(:log_dispatch)
 
         # Should not raise and should not attempt logging
         expect { adapter.acquire('lock-key', 60) }.not_to raise_error
+        expect(adapter.dispatch_registry).not_to have_received(:log_dispatch)
       end
     end
   end
