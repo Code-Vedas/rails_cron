@@ -14,7 +14,7 @@ Every time RailsCron fires a scheduled job, it provides a deterministic **idempo
 
 Each cron job receives:
 
-- **`fire_time`**: The UTC time the job was scheduled to run
+- **`fire_time`**: The time the job was scheduled to run (in your application's configured timezone)
 - **`idempotency_key`**: A deterministic key based on namespace, job key, and fire time
 
 The idempotency key is generated as: `{namespace}-{job_key}-{fire_time.to_i}`
@@ -29,6 +29,8 @@ This deterministic format ensures that:
 - The same scheduled job always generates the same key
 - Different fire times generate different keys
 - Keys are suitable for use as deduplication identifiers
+
+**Note on Timezones:** The `fire_time` object is created in your application's configured timezone (set via `Time.zone` in Rails). The idempotency key uses `fire_time.to_i` which converts to a Unix timestamp—a timezone-agnostic representation—ensuring consistent key generation regardless of timezone configuration. However, if you manually create `fire_time` objects for manual idempotency checking, ensure they're created with `Time.current` (which respects your app's timezone) rather than `Time.now` (which uses system timezone).
 
 ---
 
@@ -74,12 +76,14 @@ Use Redis directly for faster deduplication with custom TTL:
 
 ```ruby
 # At the top level (e.g., in an initializer)
+require 'connection_pool'
+
 REDIS_POOL = ConnectionPool.new(size: 5) { Redis.new(url: ENV['REDIS_URL']) }
 
 RailsCron.configure do |config|
-  config.lock_adapter = RailsCron::Lock::RedisAdapter.new(
-    REDIS_POOL.with { |redis| redis }
-  )
+  # Pass the ConnectionPool directly to the adapter
+  # The pool will check out connections as needed for each lock operation
+  config.lock_adapter = RailsCron::Lock::RedisAdapter.new(REDIS_POOL)
   # Note: enable_log_dispatch_registry can be false - deduplication happens in Redis
 end
 
@@ -87,7 +91,8 @@ RailsCron.register(
   key: 'sync:data',
   cron: '*/30 * * * *',
   enqueue: ->(fire_time:, idempotency_key:) {
-    # In the enqueue callback
+    # In the enqueue callback, also use the pool with .with blocks
+    # This ensures connections are properly managed for dispatch registry operations
     REDIS_POOL.with do |redis|
       redis_key = "railscron:dedup:#{idempotency_key}"
       unless redis.exists?(redis_key)
@@ -105,8 +110,17 @@ RailsCron.register(
 - Fast in-memory lookups with Redis
 - Custom TTL windows per job type
 - Works across multiple app instances
-- Connection pooling for production efficiency
-- No per-dispatch connection overhead
+- **Connection pooling for both lock operations and dispatch registry** - connections checked out and released as needed
+- No connection exhaustion in production
+
+**How it Works:**
+
+The `ConnectionPool` object delegates all method calls (like `:set`, `:eval`, `:exists?`) to its underlying Redis instances. When the adapter or dispatch registry code calls a method on the pool, it:
+1. Checks out a connection from the pool
+2. Executes the method on that connection
+3. Returns the connection to the pool for reuse
+
+This prevents holding a single connection for the entire application lifetime, allowing the pool to distribute load across multiple connections available in the configured size.
 
 ---
 
@@ -213,6 +227,8 @@ Use `RailsCron.dispatched?` to check if a job has been dispatched:
 
 **Note:** If you enabled `enable_log_dispatch_registry`, the dispatches are recorded in the `rails_cron_dispatches` table and can be queried directly via the CronDispatch model for audit trail purposes. However, the recommended way to check deduplication status is always through `RailsCron.dispatched?` helper.
 
+**Important:** When manually checking dispatch status outside the enqueue callback, always use `Time.current` (not `Time.now`) to ensure the fire_time is created in your application's configured timezone, matching how RailsCron generates fire_time internally.
+
 ---
 
 ## Best Practices
@@ -223,6 +239,7 @@ Use `RailsCron.dispatched?` to check if a job has been dispatched:
 - Store the idempotency_key in your job arguments for debugging
 - Log deduplication decisions for observability
 - Test your deduplication implementation before production
+- Always use `Time.current` when manually creating fire_time objects (not `Time.now`), to ensure timezone consistency
 
 ❌ **DON'T:**
 
@@ -230,6 +247,7 @@ Use `RailsCron.dispatched?` to check if a job has been dispatched:
 - Ignore the idempotency_key in your enqueue callback
 - Use non-deterministic keys (they won't deduplicate properly)
 - Forget to set appropriate TTL windows for your deduplication store
+- Use `Time.now` in deduplication checks—use `Time.current` instead to respect your app's timezone
 
 ---
 
@@ -340,3 +358,26 @@ Use `RailsCron.dispatched?` to check if a job has been dispatched:
      }
    )
    ```
+
+#### Timezone Mismatch Issues
+
+If you're manually checking dispatch status using `RailsCron.dispatched?`, ensure timezone consistency:
+
+```ruby
+# ❌ WRONG - uses system timezone (Time.now)
+time_in_system_tz = Time.now
+RailsCron.dispatched?('job:key', time_in_system_tz)
+
+# ✅ CORRECT - uses app's configured timezone (Time.current)
+time_in_app_tz = Time.current
+RailsCron.dispatched?('job:key', time_in_app_tz)
+```
+
+**Why:** RailsCron generates fire_times using `Time.current` (your app's configured timezone). When you manually check dispatch status, use the same `Time.current` to ensure the fire_time matches what RailsCron expects.
+
+**Check your app's timezone:**
+
+```ruby
+Time.zone                # => #<ActiveSupport::TimeZone:0x00... @name="UTC">
+Time.current.zone        # => "UTC" (or whatever you configured)
+```
