@@ -589,4 +589,135 @@ RSpec.describe RailsCron do
       expect(result).to be_nil
     end
   end
+
+  describe '.valid?' do
+    it 'returns true for valid 5-field cron expressions' do
+      expect(described_class.valid?('*/5 * * * *')).to be(true)
+    end
+
+    it 'returns true for supported macros' do
+      expect(described_class.valid?('@daily')).to be(true)
+    end
+
+    it 'returns false for invalid cron expressions' do
+      expect(described_class.valid?('61 * * * *')).to be(false)
+    end
+
+    it 'returns false when expression has more than 5 fields' do
+      expect(described_class.valid?('* * * * * *')).to be(false)
+    end
+
+    it 'returns false for empty expressions' do
+      expect(described_class.valid?('   ')).to be(false)
+    end
+
+    it 'returns false when expression normalization raises' do
+      invalid_expression = Object.new
+      allow(invalid_expression).to receive(:to_s).and_raise(StandardError, 'boom')
+
+      expect(described_class.valid?(invalid_expression)).to be(false)
+    end
+  end
+
+  describe '.simplify' do
+    it 'simplifies a matching cron expression to a canonical macro' do
+      expect(described_class.simplify('0 0 * * *')).to eq('@daily')
+    end
+
+    it 'returns canonical macro for macro aliases' do
+      expect(described_class.simplify('@midnight')).to eq('@daily')
+    end
+
+    it 'returns normalized expression when no macro applies' do
+      expect(described_class.simplify(' 15  9 * * 1 ')).to eq('15 9 * * 1')
+    end
+
+    it 'raises a helpful error for invalid expressions' do
+      expect do
+        described_class.simplify('not-a-cron')
+      end.to raise_error(ArgumentError, %r{Invalid cron expression 'not-a-cron'.*Examples: '\*/5 \* \* \* \*', '@daily'.})
+    end
+
+    it 'raises a helpful error for empty expressions' do
+      expect do
+        described_class.simplify('   ')
+      end.to raise_error(ArgumentError, /Invalid cron expression '<empty>'/)
+    end
+  end
+
+  describe '.lint' do
+    it 'returns no warnings for valid expressions' do
+      expect(described_class.lint('0 9 * * 1')).to eq([])
+    end
+
+    it 'returns no warnings for supported macros' do
+      expect(described_class.lint('@weekly')).to eq([])
+    end
+
+    it 'returns helpful error for empty expressions' do
+      expect(described_class.lint('')).to eq(["Invalid cron expression '<empty>'. Examples: '*/5 * * * *', '@daily'."])
+    end
+
+    it 'returns field count errors for non-5-field expressions' do
+      result = described_class.lint('* * * * * *')
+      expect(result.first).to match(/Expected 5 fields/)
+    end
+
+    it 'returns step out-of-range warnings' do
+      result = described_class.lint('*/61 * * * *')
+      expect(result).to include("minute step '61' is out of range. Allowed step: 1-60.")
+    end
+
+    it 'accepts valid star steps' do
+      expect(described_class.lint('*/2 * * * *')).to eq([])
+    end
+
+    it 'returns helpful error for unsupported macros' do
+      result = described_class.lint('@every_5m')
+      expect(result.first).to match(/Unsupported cron macro '@every_5m'/)
+    end
+
+    it 'accepts valid ranges and step segments' do
+      expect(described_class.lint('1-5 * * * *')).to eq([])
+      expect(described_class.lint('5/2 * * * *')).to eq([])
+    end
+
+    it 'flags out-of-range values in ranges' do
+      result = described_class.lint('99-100 * * * *')
+      expect(result).to include("minute range '99-100' contains an out-of-range value.")
+    end
+
+    it 'flags out-of-range single values' do
+      result = described_class.lint('99 * * * *')
+      expect(result).to include("minute value '99' is out of range (0-59).")
+    end
+
+    it 'flags reversed ranges' do
+      result = described_class.lint('10-5 * * * *')
+      expect(result).to include("minute range '10-5' has start greater than end.")
+    end
+
+    it 'accepts valid range steps' do
+      expect(described_class.lint('1-5/2 * * * *')).to eq([])
+    end
+
+    it 'flags range steps outside the range span' do
+      result = described_class.lint('1-3/5 * * * *')
+      expect(result).to include("minute step '5' is out of range for range '1-3/5'. Allowed step: 1-3.")
+    end
+
+    it 'flags base step with out-of-range base values' do
+      result = described_class.lint('foo/2 * * * *')
+      expect(result).to include("minute value 'foo/2' contains an out-of-range value.")
+    end
+
+    it 'flags base step with non-positive step values' do
+      result = described_class.lint('5/0 * * * *')
+      expect(result).to include("minute step '0' is out of range. Allowed step: 1 or greater.")
+    end
+
+    it 'supports named month and day tokens' do
+      expect(described_class.lint('0 9 * jan mon')).to eq([])
+    end
+  end
 end

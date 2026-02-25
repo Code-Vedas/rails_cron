@@ -19,6 +19,7 @@ require 'rails_cron/lock/postgres_adapter'
 require 'rails_cron/lock/mysql_adapter'
 require 'rails_cron/lock/sqlite_adapter'
 require 'rails_cron/idempotency_key_generator'
+require 'rails_cron/cron_utils'
 require 'rails_cron/coordinator'
 require 'rails_cron/railtie'
 
@@ -423,6 +424,34 @@ module RailsCron
 
     def validate!
       configuration.validate!
+    end
+
+    ##
+    # Validate a cron expression.
+    #
+    # @param expression [String] cron expression
+    # @return [Boolean] true if valid, false otherwise
+    def valid?(expression)
+      CronUtils.valid?(expression)
+    end
+
+    ##
+    # Simplify a cron expression to a predefined macro when possible.
+    #
+    # @param expression [String] cron expression
+    # @return [String] simplified expression or canonical input
+    # @raise [ArgumentError] when expression is invalid
+    def simplify(expression)
+      CronUtils.simplify(expression)
+    end
+
+    ##
+    # Lint a cron expression and return warnings/errors.
+    #
+    # @param expression [String] cron expression
+    # @return [Array<String>] lint warnings/errors
+    def lint(expression)
+      CronUtils.lint(expression)
     end
   end
 end
