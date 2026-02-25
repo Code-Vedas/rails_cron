@@ -91,6 +91,33 @@ bin/rails rails_cron:explain["*/5 * * * *"] # Humanize a cron expression
 
 ---
 
+## 🧠 Cron Utilities
+
+`RailsCron` provides convenience helpers for validating, simplifying, and linting cron expressions.
+
+```ruby
+RailsCron.valid?("*/5 * * * *")
+# => true
+
+RailsCron.simplify("0 0 * * *")
+# => "@daily"
+
+RailsCron.lint("*/61 * * * *")
+# => ["minute step '61' is out of range. Allowed step: 1-60.", "Invalid cron expression '*/61 * * * *'. Examples: '*/5 * * * *', '@daily'."]
+```
+
+Supported predefined macros include:
+`@yearly`, `@annually`, `@monthly`, `@weekly`, `@daily`, `@midnight`, `@hourly`.
+
+`RailsCron.simplify` raises `ArgumentError` for invalid expressions with helpful examples:
+
+```ruby
+RailsCron.simplify("not-a-cron")
+# raises ArgumentError: Invalid cron expression 'not-a-cron'. Examples: '*/5 * * * *', '@daily'.
+```
+
+---
+
 ## 🔍 Checking Status
 
 ```bash

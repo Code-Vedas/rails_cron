@@ -23,7 +23,7 @@ Then, the same cron tick may run **N times** where N = number of processes or po
 - **Centralized registry** — All crons defined in one place, version-controlled with your code.
 - **Redis or Postgres locks** — Choose your preferred distributed locking mechanism.
 - **Portable & lightweight** — Runs as a standalone process, Rake task, or inline with Rails.
-- **Developer-friendly** — Humanize, lint, and translate cron expressions in multiple languages.
+- **Developer-friendly** — Validate, lint, and simplify cron expressions with clear feedback.
 
 ---
 
@@ -35,7 +35,7 @@ Then, the same cron tick may run **N times** where N = number of processes or po
 - **Rails-native integration** — Uses ActiveJob, `Rails.logger`, and Railtie for auto-loading tasks.
 - **Graceful shutdown** — Completes current tick before exiting on `TERM` or `INT`.
 - **Standalone-friendly** — Run as a background process via Procfile, systemd, or Kubernetes.
-- **Internationalization (i18n)** — Full locale support for humanized cron expressions.
+- **Cron helpers** — Built-in helpers for safe cron authoring workflows.
 - **MIT licensed** — Fully open source, with no paid or enterprise tier.
 
 ---
@@ -58,7 +58,7 @@ Then, the same cron tick may run **N times** where N = number of processes or po
 - You deploy **multiple web or job nodes** and need **only one node** to enqueue scheduled work.
 - You want **one unified registry** for all scheduled tasks, in code — not in crontab files.
 - You prefer to **stay job-system agnostic** while maintaining visibility and control.
-- You need **i18n-friendly** cron utilities for user-facing scheduling features.
+- You need **validation and linting helpers** while authoring cron schedules.
 - You want a **lightweight, zero-dependency** alternative to heavy schedulers.
 
 ---
