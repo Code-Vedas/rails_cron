@@ -20,6 +20,7 @@ require 'rails_cron/lock/mysql_adapter'
 require 'rails_cron/lock/sqlite_adapter'
 require 'rails_cron/idempotency_key_generator'
 require 'rails_cron/cron_utils'
+require 'rails_cron/cron_humanizer'
 require 'rails_cron/coordinator'
 require 'rails_cron/railtie'
 
@@ -452,6 +453,17 @@ module RailsCron
     # @return [Array<String>] lint warnings/errors
     def lint(expression)
       CronUtils.lint(expression)
+    end
+
+    ##
+    # Convert a cron expression to a human-friendly phrase.
+    #
+    # @param expression [String] cron expression
+    # @param locale [Symbol, String, nil] locale override (defaults to current I18n.locale)
+    # @return [String] localized phrase
+    # @raise [ArgumentError] when expression is invalid
+    def to_human(expression, locale: nil)
+      CronHumanizer.to_human(expression, locale: locale)
     end
   end
 end

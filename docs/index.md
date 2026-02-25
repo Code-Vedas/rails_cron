@@ -51,7 +51,7 @@ bin/rails g rails_cron:install
 - **Lock adapters**: Redis (`SET NX PX`) and Postgres (`pg_try_advisory_lock`), plus in-memory fallback
 - **Registry & API**: Centralized job registration with deterministic idempotency keys
 - **Dispatch recovery**: Replays missed runs within a configurable lookback window
-- **Cron utilities**: Validate (`RailsCron.valid?`), lint (`RailsCron.lint`), and simplify (`RailsCron.simplify`) with predefined macros like `@daily`
+- **Cron utilities**: Validate, lint, simplify, and humanize via `RailsCron.valid?`, `RailsCron.lint`, `RailsCron.simplify`, and `RailsCron.to_human`
 - **i18n keys**: Fully localizable weekdays, months, and time phrases (`rails_cron.*`)
 - **CLI tools**: `rails-crons explain`, `next`, `run`, and Rails Rake tasks (`rails_cron:start`, `status`, etc.)
 - **Standalone mode**: Launch scheduler via Procfile, systemd, or Kubernetes

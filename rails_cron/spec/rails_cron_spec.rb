@@ -7,6 +7,7 @@
 
 require 'spec_helper'
 require 'stringio'
+require 'i18n'
 
 RSpec.describe RailsCron do
   let(:adapter) { Object.new }
@@ -745,6 +746,182 @@ RSpec.describe RailsCron do
       allow(invalid_expression).to receive(:to_s).and_raise(StandardError, 'boom')
 
       expect(described_class.lint(invalid_expression)).to eq(["Invalid cron expression '<empty>'. Examples: '*/5 * * * *', '@daily'."])
+    end
+  end
+
+  describe '.to_human' do
+    around do |example|
+      original_locale = I18n.locale
+      original_available_locales = I18n.available_locales
+      I18n.available_locales = (original_available_locales + [:zz]).uniq
+      I18n.backend.store_translations(:zz, {
+                                        rails_cron: {
+                                          every: 'cada',
+                                          at: 'a las',
+                                          and: 'y',
+                                          time: {
+                                            minute: 'minuto',
+                                            minutes: 'minutos',
+                                            hour: 'hora',
+                                            hours: 'horas',
+                                            day: 'dia',
+                                            days: 'dias',
+                                            week: 'semana',
+                                            weeks: 'semanas',
+                                            month: 'mes',
+                                            months: 'meses'
+                                          },
+                                          weekdays: {
+                                            '0' => 'domingo',
+                                            '1' => 'lunes',
+                                            '2' => 'martes',
+                                            '3' => 'miercoles',
+                                            '4' => 'jueves',
+                                            '5' => 'viernes',
+                                            '6' => 'sabado'
+                                          },
+                                          months: {
+                                            '1' => 'enero',
+                                            '2' => 'febrero',
+                                            '3' => 'marzo',
+                                            '4' => 'abril',
+                                            '5' => 'mayo',
+                                            '6' => 'junio',
+                                            '7' => 'julio',
+                                            '8' => 'agosto',
+                                            '9' => 'septiembre',
+                                            '10' => 'octubre',
+                                            '11' => 'noviembre',
+                                            '12' => 'diciembre'
+                                          },
+                                          phrases: {
+                                            daily: 'Diario',
+                                            weekly: 'Semanal',
+                                            monthly: 'Mensual',
+                                            hourly: 'Cada hora',
+                                            yearly: 'Anual',
+                                            at_time: 'A las %<time>s',
+                                            every_interval: 'Cada %<count>s %<unit>s',
+                                            cron_expression: 'Cron: %<expression>s'
+                                          }
+                                        }
+                                      })
+      example.run
+      I18n.locale = original_locale
+      I18n.available_locales = original_available_locales
+    end
+
+    it 'humanizes weekly fixed-time expressions' do
+      expect(described_class.to_human('0 9 * * 1')).to eq('At 09:00 every Monday')
+    end
+
+    it 'humanizes predefined macros' do
+      expect(described_class.to_human('@daily')).to eq('Daily')
+    end
+
+    it 'uses current I18n.locale when locale is nil' do
+      I18n.locale = :zz
+      expect(described_class.to_human('0 9 * * 1')).to eq('A las 09:00 cada lunes')
+    end
+
+    it 'uses locale override when provided' do
+      I18n.locale = :en
+      expect(described_class.to_human('0 9 * * 1', locale: :zz)).to eq('A las 09:00 cada lunes')
+    end
+
+    it 'humanizes every-minute intervals' do
+      expect(described_class.to_human('*/5 * * * *')).to eq('Every 5 minutes')
+    end
+
+    it 'uses singular units for 1-minute intervals' do
+      unit = RailsCron::CronHumanizer.send(:interval_unit, 1, singular: 'minute', plural: 'minutes')
+      expect(unit).to eq('minute')
+    end
+
+    it 'humanizes fixed-time daily expressions' do
+      expect(described_class.to_human('30 10 * * *')).to eq('At 10:30 every day')
+    end
+
+    it 'humanizes 5-field expressions that map to canonical macros' do
+      expect(described_class.to_human('0 0 * * *')).to eq('Daily')
+    end
+
+    it 'treats weekday 7 as Sunday' do
+      expect(described_class.to_human('0 9 * * 7')).to eq('At 09:00 every Sunday')
+    end
+
+    it 'falls back to canonical cron text for unsupported complex expressions' do
+      expect(described_class.to_human('15 10 2 3 *')).to eq('Cron: 15 10 2 3 *')
+    end
+
+    it 'falls back to canonical cron text for multi-weekday ranges' do
+      expect(described_class.to_human('0 9 * * 1-2')).to eq('Cron: 0 9 * * 1,2')
+    end
+
+    it 'falls back when minute intervals are irregular' do
+      expect(described_class.to_human('0,10,25 * * * *')).to eq('Cron: 0,10,25 * * * *')
+    end
+
+    it 'falls back when macro phrase mapping is unavailable' do
+      stub_const('RailsCron::CronHumanizer::MACRO_PHRASES', {})
+      expect(described_class.to_human('@daily')).to eq('Cron: @daily')
+    end
+
+    it 'falls back when the humanized phrase is blank' do
+      allow(RailsCron::CronHumanizer).to receive(:humanize_expression).and_return('  ')
+      expect(described_class.to_human('0 9 * * 1')).to eq('Cron: 0 9 * * 1')
+    end
+
+    it 'does not swallow unexpected parser errors' do
+      allow(Fugit).to receive(:parse_cron).with('0 1 * * *').and_raise(StandardError, 'boom')
+
+      expect do
+        described_class.to_human('0 1 * * *')
+      end.to raise_error(StandardError, 'boom')
+    end
+
+    it 'raises invalid-expression errors for empty input' do
+      expect do
+        described_class.to_human('   ')
+      end.to raise_error(ArgumentError, /Invalid cron expression '<empty>'/)
+    end
+
+    it 'raises helpful error for invalid cron expressions' do
+      expect do
+        described_class.to_human('invalid')
+      end.to raise_error(ArgumentError, /Invalid cron expression 'invalid'/)
+    end
+
+    it 'raises unsupported macro errors for unknown macros' do
+      expect do
+        described_class.to_human('@every_5m')
+      end.to raise_error(ArgumentError, /Unsupported cron macro '@every_5m'/)
+    end
+
+    it 'raises invalid-expression errors when normalization fails' do
+      invalid_expression = Object.new
+      allow(invalid_expression).to receive(:to_s).and_raise(StandardError, 'boom')
+
+      expect do
+        described_class.to_human(invalid_expression)
+      end.to raise_error(ArgumentError, /Invalid cron expression '<empty>'/)
+    end
+
+    it 'returns fallback text for non-interval minute-only schedules' do
+      expect(described_class.to_human('5 * * * *')).to eq('Cron: 5 * * * *')
+    end
+
+    it 'covers helper edge branches for interval and weekday extraction' do
+      expect(RailsCron::CronHumanizer.send(:derive_interval, [5, 10, 15])).to be_nil
+      expect(RailsCron::CronHumanizer.send(:derive_interval, [0, 0, 5])).to be_nil
+      expect(RailsCron::CronHumanizer.send(:derive_interval, [0, 0, 0])).to be_nil
+      expect(RailsCron::CronHumanizer.send(:derive_interval, [0, 10, 20])).to be_nil
+
+      expect(RailsCron::CronHumanizer.send(:extract_weekday, [1])).to eq(1)
+      expect(RailsCron::CronHumanizer.send(:extract_weekday, ['mon'])).to be_nil
+      expect(RailsCron::CronHumanizer.send(:extract_weekday, [['mon']])).to be_nil
+
+      expect(RailsCron::CronHumanizer.send(:weekday_name, 7)).to eq('Sunday')
     end
   end
 end

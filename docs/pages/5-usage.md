@@ -104,6 +104,15 @@ RailsCron.simplify("0 0 * * *")
 
 RailsCron.lint("*/61 * * * *")
 # => ["minute step '61' is out of range. Allowed step: 1-60.", "Invalid cron expression '*/61 * * * *'. Examples: '*/5 * * * *', '@daily'."]
+
+RailsCron.to_human("0 9 * * 1")
+# => "At 09:00 every Monday"
+
+RailsCron.to_human("@daily")
+# => "Daily"
+
+RailsCron.to_human("0 9 * * 1", locale: :fr)
+# => Uses :fr locale when available
 ```
 
 Supported predefined macros include:
@@ -115,6 +124,8 @@ Supported predefined macros include:
 RailsCron.simplify("not-a-cron")
 # raises ArgumentError: Invalid cron expression 'not-a-cron'. Examples: '*/5 * * * *', '@daily'.
 ```
+
+`RailsCron.to_human` also raises `ArgumentError` for invalid expressions and unsupported macros.
 
 ---
 
