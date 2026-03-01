@@ -37,7 +37,9 @@ RSpec.describe RailsCron::RakeTasks do
     it 'aborts on errors' do
       allow(RailsCron).to receive(:tick!).and_raise(StandardError, 'boom')
 
-      expect { task('rails_cron:tick').invoke }.to raise_error(SystemExit)
+      expect { task('rails_cron:tick').invoke }
+        .to raise_error(SystemExit)
+        .and output(/rails_cron:tick failed: boom/).to_stderr
     end
   end
 
@@ -64,7 +66,10 @@ RSpec.describe RailsCron::RakeTasks do
     it 'aborts on errors' do
       allow(RailsCron).to receive(:running?).and_raise(StandardError, 'boom')
 
-      expect { task('rails_cron:status').invoke }.to raise_error(SystemExit)
+      expect { task('rails_cron:status').invoke }
+        .to raise_error(SystemExit)
+        .and output(/RailsCron v/).to_stdout
+        .and output(/rails_cron:status failed: boom/).to_stderr
     end
   end
 
@@ -76,17 +81,32 @@ RSpec.describe RailsCron::RakeTasks do
     end
 
     it 'aborts when expression argument is missing' do
-      expect { task('rails_cron:explain').invoke }.to raise_error(SystemExit)
+      expect { task('rails_cron:explain').invoke }
+        .to raise_error(SystemExit)
+        .and output(/rails_cron:explain requires expr argument/).to_stderr
     end
 
     it 'aborts with invalid cron expressions' do
       allow(RailsCron).to receive(:to_human).and_raise(ArgumentError, 'Invalid cron expression')
 
-      expect { task('rails_cron:explain').invoke('bad') }.to raise_error(SystemExit)
+      expect { task('rails_cron:explain').invoke('bad') }
+        .to raise_error(SystemExit)
+        .and output(/rails_cron:explain failed: Invalid cron expression/).to_stderr
     end
   end
 
   describe 'rails_cron:start' do
+    let(:captured_signal_handlers) { {} }
+
+    before do
+      allow(Signal).to receive(:trap) do |signal, _handler = nil, &block|
+        if block
+          captured_signal_handlers[signal] = block
+          'DEFAULT'
+        end
+      end
+    end
+
     it 'starts scheduler in foreground and joins thread' do
       thread = instance_double(Thread, join: nil)
       allow(RailsCron).to receive(:start!).and_return(thread)
@@ -98,23 +118,87 @@ RSpec.describe RailsCron::RakeTasks do
     it 'aborts when scheduler is already running' do
       allow(RailsCron).to receive(:start!).and_return(nil)
 
-      expect { task('rails_cron:start').invoke }.to raise_error(SystemExit)
+      expect { task('rails_cron:start').invoke }
+        .to raise_error(SystemExit)
+        .and output(/rails_cron:start failed: scheduler is already running/).to_stderr
     end
 
     it 'handles interrupts by stopping scheduler' do
       thread = instance_double(Thread)
       allow(thread).to receive(:join).and_raise(Interrupt)
       allow(RailsCron).to receive(:start!).and_return(thread)
-      allow(RailsCron).to receive(:stop!).with(timeout: 30)
+      allow(RailsCron).to receive(:stop!).with(timeout: 30).and_return(true)
 
-      expect { task('rails_cron:start').invoke }.to output(/scheduler stopped/).to_stdout
+      expect { task('rails_cron:start').invoke }.to output(/Received INT.*scheduler stopped/m).to_stdout
       expect(RailsCron).to have_received(:stop!).with(timeout: 30)
+    end
+
+    it 'handles TERM by stopping scheduler gracefully' do
+      thread = instance_double(Thread)
+      allow(RailsCron).to receive(:start!).and_return(thread)
+      allow(RailsCron).to receive(:stop!).with(timeout: 30).and_return(true)
+
+      allow(thread).to receive(:join) do
+        captured_signal_handlers.fetch('TERM').call
+      end
+
+      expect { task('rails_cron:start').invoke }.to output(/Received TERM.*scheduler stopped/m).to_stdout
+      expect(RailsCron).to have_received(:stop!).with(timeout: 30).once
+    end
+
+    it 'stops only once when multiple signals are received' do
+      thread = instance_double(Thread)
+      allow(RailsCron).to receive(:start!).and_return(thread)
+      allow(RailsCron).to receive(:stop!).with(timeout: 30).and_return(true)
+
+      allow(thread).to receive(:join) do
+        captured_signal_handlers.fetch('TERM').call
+        captured_signal_handlers.fetch('INT').call
+      end
+
+      expect { task('rails_cron:start').invoke }.to output(/Received TERM.*scheduler stopped/m).to_stdout
+
+      expect(RailsCron).to have_received(:stop!).with(timeout: 30).once
+    end
+
+    it 'prints timeout message when scheduler stop times out' do
+      thread = instance_double(Thread)
+      allow(RailsCron).to receive(:start!).and_return(thread)
+      allow(RailsCron).to receive(:stop!).with(timeout: 30).and_return(false)
+
+      allow(thread).to receive(:join) do
+        captured_signal_handlers.fetch('TERM').call
+      end
+
+      expect { task('rails_cron:start').invoke }.to output(/scheduler stop timed out/).to_stdout
     end
 
     it 'aborts when start raises unexpected errors' do
       allow(RailsCron).to receive(:start!).and_raise(StandardError, 'boom')
 
-      expect { task('rails_cron:start').invoke }.to raise_error(SystemExit)
+      expect { task('rails_cron:start').invoke }
+        .to raise_error(SystemExit)
+        .and output(/rails_cron:start failed: boom/).to_stderr
+    end
+  end
+
+  describe '.restore_signal_handlers' do
+    it 'swallows errors when restoring handlers fails' do
+      allow(Signal).to receive(:trap).and_raise(StandardError, 'trap restore failure')
+
+      expect { described_class.restore_signal_handlers('TERM' => 'DEFAULT') }.not_to raise_error
+    end
+  end
+
+  describe '.shutdown_scheduler' do
+    it 'logs warning to stderr when stop raises' do
+      signal_state = { shutdown_requested: false }
+      allow(RailsCron).to receive(:stop!).and_raise(StandardError, 'stop blew up')
+
+      expect do
+        described_class.shutdown_scheduler(signal: 'TERM', signal_state: signal_state)
+      end.to output(/Received TERM, stopping RailsCron scheduler/).to_stdout
+                                                                  .and output(/shutdown failed: stop blew up/).to_stderr
     end
   end
 

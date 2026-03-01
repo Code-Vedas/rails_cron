@@ -51,7 +51,7 @@ You can start the scheduler loop in one of two ways:
 RailsCron.start!
 ```
 
-> This starts the scheduler automatically when Rails boots.
+> Use this mainly for development/testing. In production, prefer a standalone scheduler process.
 
 ### Option 2 — Standalone process (recommended for production)
 
@@ -65,6 +65,66 @@ Example **Procfile** entry:
 web:       bundle exec puma -C config/puma.rb
 scheduler: bundle exec rails rails_cron:start
 ```
+
+Avoid running scheduler inside web server processes by default. Keep scheduler lifecycle independent from request-serving processes.
+
+### systemd Example
+
+```ini
+[Unit]
+Description=RailsCron scheduler
+After=network.target
+
+[Service]
+Type=simple
+User=deploy
+WorkingDirectory=/var/apps/myapp/current
+Environment=RAILS_ENV=production
+ExecStart=/usr/bin/bash -lc 'bundle exec rails rails_cron:start'
+ExecStartPre=/usr/bin/bash -lc 'bundle exec rails rails_cron:status'
+ExecReload=/bin/kill -TERM $MAINPID
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+### Kubernetes Example (with probes)
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rails-cron-scheduler
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rails-cron-scheduler
+  template:
+    metadata:
+      labels:
+        app: rails-cron-scheduler
+    spec:
+      containers:
+        - name: scheduler
+          image: your-app:latest
+          command: ["bash", "-lc", "bundle exec rails rails_cron:start"]
+          readinessProbe:
+            exec:
+              command: ["bash", "-lc", "bundle exec rails rails_cron:status"]
+            initialDelaySeconds: 20
+            periodSeconds: 30
+          livenessProbe:
+            exec:
+              command: ["bash", "-lc", "bundle exec rails rails_cron:status"]
+            initialDelaySeconds: 30
+            periodSeconds: 60
+```
+
+`rails_cron:status` is the default command probe option.  
+If process startup cost is a concern, use an application health endpoint that reports scheduler status.
 
 ---
 

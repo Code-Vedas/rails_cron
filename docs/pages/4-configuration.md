@@ -153,12 +153,15 @@ RailsCron.start!
 ```
 
 Starts automatically when Rails boots.
+Prefer this for local/dev workflows.
 
 ### Option 2 — Standalone Process (Recommended)
 
 ```bash
 bundle exec rails rails_cron:start
 ```
+
+Use this as the default in production so scheduler restarts and deploy lifecycles are independent from web processes.
 
 **Procfile Example:**
 
@@ -291,7 +294,7 @@ end
 
 ## 🧩 Multiple Nodes
 
-You can safely run multiple schedulers (e.g., in Kubernetes, ECS, or multiple dynos).
+You can safely run multiple schedulers (e.g., in Kubernetes, ECS, or multiple scheduler processes).
 Distributed locks ensure **only one** node dispatches jobs for each tick.
 
 **Checklist:**

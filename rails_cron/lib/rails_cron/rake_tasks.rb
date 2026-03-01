@@ -11,6 +11,9 @@ module RailsCron
   ##
   # Defines RailsCron rake tasks on a given Rake application.
   module RakeTasks
+    SIGNALS = %w[TERM INT].freeze
+    SHUTDOWN_TIMEOUT = 30
+
     module_function
 
     def install(rake_application = Rake.application)
@@ -83,14 +86,47 @@ module RailsCron
           abort('rails_cron:start failed: scheduler is already running') unless thread
 
           puts 'RailsCron scheduler started in foreground'
-          thread.join
+          signal_state = { shutdown_requested: false }
+          previous_handlers = RailsCron::RakeTasks.install_foreground_signal_handlers(signal_state)
+
+          begin
+            thread.join
+          ensure
+            RailsCron::RakeTasks.restore_signal_handlers(previous_handlers)
+          end
         rescue Interrupt
-          RailsCron.stop!(timeout: 30)
-          puts 'RailsCron scheduler stopped'
+          RailsCron::RakeTasks.shutdown_scheduler(signal: 'INT', signal_state: { shutdown_requested: false })
         rescue StandardError => e
           abort("rails_cron:start failed: #{e.message}")
         end
       end
+    end
+
+    def install_foreground_signal_handlers(signal_state)
+      SIGNALS.each_with_object({}) do |signal, handlers|
+        handlers[signal] = Signal.trap(signal) do
+          shutdown_scheduler(signal: signal, signal_state: signal_state)
+        end
+      end
+    end
+
+    def restore_signal_handlers(previous_handlers)
+      previous_handlers.each do |signal, handler|
+        Signal.trap(signal, handler)
+      rescue StandardError
+        nil
+      end
+    end
+
+    def shutdown_scheduler(signal:, signal_state:)
+      return if signal_state[:shutdown_requested]
+
+      signal_state[:shutdown_requested] = true
+      puts "Received #{signal}, stopping RailsCron scheduler..."
+      stopped = RailsCron.stop!(timeout: SHUTDOWN_TIMEOUT)
+      puts(stopped ? 'RailsCron scheduler stopped' : 'RailsCron scheduler stop timed out')
+    rescue StandardError => e
+      warn("rails_cron:start shutdown failed: #{e.message}")
     end
   end
 end

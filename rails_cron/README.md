@@ -142,7 +142,10 @@ RailsCron.to_human("0 9 * * 1")   # => "À 09h00 chaque lundi"
 
 ## 🧱 Running the Scheduler
 
-**Procfile (Heroku / Foreman):**
+Run the scheduler as a dedicated process in production.  
+Do not run it inside web server processes by default.
+
+**Procfile (process manager):**
 
 ```procfile
 web:       bundle exec puma -C config/puma.rb
@@ -152,11 +155,23 @@ scheduler: bundle exec rails rails_cron:start
 **systemd unit:**
 
 ```ini
+[Unit]
+Description=RailsCron scheduler
+After=network.target
+
 [Service]
 Type=simple
+User=deploy
 WorkingDirectory=/var/apps/myapp/current
+Environment=RAILS_ENV=production
 ExecStart=/usr/bin/bash -lc 'bundle exec rails rails_cron:start'
+ExecStartPre=/usr/bin/bash -lc 'bundle exec rails rails_cron:status'
+ExecReload=/bin/kill -TERM $MAINPID
 Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
 ```
 
 **Kubernetes Deployment:**
@@ -168,13 +183,32 @@ metadata:
   name: rails-cron
 spec:
   replicas: 1
+  selector:
+    matchLabels:
+      app: rails-cron-scheduler
   template:
+    metadata:
+      labels:
+        app: rails-cron-scheduler
     spec:
       containers:
         - name: scheduler
           image: your-app:latest
           command: ["bash", "-lc", "bundle exec rails rails_cron:start"]
+          readinessProbe:
+            exec:
+              command: ["bash", "-lc", "bundle exec rails rails_cron:status"]
+            initialDelaySeconds: 20
+            periodSeconds: 30
+          livenessProbe:
+            exec:
+              command: ["bash", "-lc", "bundle exec rails rails_cron:status"]
+            initialDelaySeconds: 30
+            periodSeconds: 60
 ```
+
+`rails_cron:status` is a practical command probe for operations.  
+If your environment needs cheaper probes, expose an app health endpoint that checks scheduler status and use that endpoint.
 
 ---
 
