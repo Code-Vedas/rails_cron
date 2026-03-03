@@ -13,7 +13,12 @@ RSpec.describe RailsCron::Lock::RedisAdapter do
   let(:adapter) { described_class.new(redis_client) }
 
   before do
+    RailsCron.reset_configuration!
     allow(Redis).to receive(:new).and_return(redis_client)
+  end
+
+  after do
+    RailsCron.reset_configuration!
   end
 
   describe '#initialize' do
