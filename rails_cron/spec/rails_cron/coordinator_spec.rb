@@ -520,7 +520,7 @@ RSpec.describe RailsCron::Coordinator do
     it 'iterates over enabled definitions and yields resolved entries' do
       registry.add(key: 'job:one', cron: '* * * * *', enqueue: kw_enqueue)
       definitions = [{ key: 'job:one', cron: '*/5 * * * *', enabled: true }]
-      definition_registry = instance_double(RailsCron::Definition::Registry, enabled_definitions: definitions)
+      definition_registry = instance_double(RailsCron::Definition::Registry, all_definitions: definitions)
       allow(RailsCron).to receive(:definition_registry).and_return(definition_registry)
 
       yielded = []
@@ -534,7 +534,7 @@ RSpec.describe RailsCron::Coordinator do
     it 'warns and skips definitions with missing callback registrations' do
       definition_registry = instance_double(
         RailsCron::Definition::Registry,
-        enabled_definitions: [{ key: 'job:missing', cron: '* * * * *', enabled: true }]
+        all_definitions: [{ key: 'job:missing', cron: '* * * * *', enabled: true }]
       )
       allow(RailsCron).to receive(:definition_registry).and_return(definition_registry)
 
@@ -549,7 +549,7 @@ RSpec.describe RailsCron::Coordinator do
       configuration.logger = nil
       definition_registry = instance_double(
         RailsCron::Definition::Registry,
-        enabled_definitions: [{ key: 'job:missing-no-logger', cron: '* * * * *', enabled: true }]
+        all_definitions: [{ key: 'job:missing-no-logger', cron: '* * * * *', enabled: true }]
       )
       allow(RailsCron).to receive(:definition_registry).and_return(definition_registry)
 
@@ -563,7 +563,7 @@ RSpec.describe RailsCron::Coordinator do
       allow(registry).to receive(:find).with('job:nil-enqueue').and_return(callback_entry)
       definition_registry = instance_double(
         RailsCron::Definition::Registry,
-        enabled_definitions: [{ key: 'job:nil-enqueue', cron: '* * * * *', enabled: true }]
+        all_definitions: [{ key: 'job:nil-enqueue', cron: '* * * * *', enabled: true }]
       )
       allow(RailsCron).to receive(:definition_registry).and_return(definition_registry)
 
@@ -574,10 +574,35 @@ RSpec.describe RailsCron::Coordinator do
       expect(logger).to have_received(:warn).with(/No enqueue callback registered for definition 'job:nil-enqueue'/)
     end
 
+    it 'yields nothing when persisted definitions exist but all are disabled' do
+      registry.add(key: 'job:disabled', cron: '* * * * *', enqueue: kw_enqueue)
+      definition_registry = instance_double(
+        RailsCron::Definition::Registry,
+        all_definitions: [{ key: 'job:disabled', cron: '* * * * *', enabled: false }]
+      )
+      allow(RailsCron).to receive(:definition_registry).and_return(definition_registry)
+
+      yielded = []
+      coordinator.send(:each_enabled_entry) { |entry| yielded << entry.key }
+
+      expect(yielded).to eq([])
+    end
+
+    it 'falls back to in-memory registry iteration when no persisted definitions exist' do
+      registry.add(key: 'job:fallback', cron: '* * * * *', enqueue: kw_enqueue)
+      definition_registry = instance_double(RailsCron::Definition::Registry, all_definitions: [])
+      allow(RailsCron).to receive(:definition_registry).and_return(definition_registry)
+
+      yielded = []
+      coordinator.send(:each_enabled_entry) { |entry| yielded << entry.key }
+
+      expect(yielded).to eq(['job:fallback'])
+    end
+
     it 'falls back to in-memory registry iteration when definition iteration fails' do
       registry.add(key: 'job:fallback', cron: '* * * * *', enqueue: kw_enqueue)
       definition_registry = instance_double(RailsCron::Definition::Registry)
-      allow(definition_registry).to receive(:enabled_definitions).and_raise(StandardError, 'boom')
+      allow(definition_registry).to receive(:all_definitions).and_raise(StandardError, 'boom')
       allow(RailsCron).to receive(:definition_registry).and_return(definition_registry)
 
       yielded = []
@@ -591,7 +616,7 @@ RSpec.describe RailsCron::Coordinator do
       configuration.logger = nil
       registry.add(key: 'job:fallback', cron: '* * * * *', enqueue: kw_enqueue)
       definition_registry = instance_double(RailsCron::Definition::Registry)
-      allow(definition_registry).to receive(:enabled_definitions).and_raise(StandardError, 'boom')
+      allow(definition_registry).to receive(:all_definitions).and_raise(StandardError, 'boom')
       allow(RailsCron).to receive(:definition_registry).and_return(definition_registry)
 
       yielded = []

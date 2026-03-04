@@ -147,10 +147,12 @@ module RailsCron
       raise RegistryError, "Key '#{key}' is already registered" if registry.registered?(key)
 
       definition_registry.upsert_definition(key: key, cron: cron, enabled: true, source: 'code', metadata: {})
-      registry.add(key: key, cron: cron, enqueue: enqueue)
-    rescue StandardError
-      definition_registry.remove_definition(key)
-      raise
+      begin
+        registry.add(key: key, cron: cron, enqueue: enqueue)
+      rescue StandardError
+        definition_registry.remove_definition(key)
+        raise
+      end
     end
 
     ##

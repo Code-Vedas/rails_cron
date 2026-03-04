@@ -4,7 +4,7 @@ require_relative 'registry'
 
 module RailsCron
   module Definition
-    # ActiveRecord-backed definition registry persisted in rails_cron_cron_definitions.
+    # ActiveRecord-backed definition registry persisted in rails_cron_definitions.
     class DatabaseEngine < Registry
       def initialize
         super
