@@ -29,20 +29,26 @@ RSpec.describe RailsCron::Backend::DispatchLogging do
   end
 
   describe '#log_dispatch_attempt' do
+    around do |example|
+      original_logger = RailsCron.configuration.logger
+      original_logging = RailsCron.configuration.enable_log_dispatch_registry
+
+      example.run
+    ensure
+      RailsCron.configuration.logger = original_logger
+      RailsCron.configuration.enable_log_dispatch_registry = original_logging
+    end
+
     context 'when adapter does not respond to dispatch_registry' do
       it 'returns early without logging' do
         adapter = test_class_without_registry.new
         logger = instance_double(Logger, error: nil)
-        original_logger = RailsCron.configuration.logger
         RailsCron.configuration.logger = logger
         RailsCron.configuration.enable_log_dispatch_registry = true
 
         # Should not raise error despite missing dispatch_registry method
         expect { adapter.log_dispatch_attempt('railscron:dispatch:job:1234567890') }.not_to raise_error
         expect(logger).not_to have_received(:error)
-
-        RailsCron.configuration.logger = original_logger
-        RailsCron.configuration.enable_log_dispatch_registry = false
       end
     end
 
@@ -54,16 +60,11 @@ RSpec.describe RailsCron::Backend::DispatchLogging do
         allow(registry).to receive(:log_dispatch).and_raise(StandardError, 'Test error')
 
         # Ensure logger is nil
-        original_logger = RailsCron.configuration.logger
         RailsCron.configuration.logger = nil
         RailsCron.configuration.enable_log_dispatch_registry = true
 
         # Should not raise, even though logger is nil
         expect { adapter.log_dispatch_attempt('railscron:dispatch:job:1234567890') }.not_to raise_error
-
-        # Restore
-        RailsCron.configuration.logger = original_logger
-        RailsCron.configuration.enable_log_dispatch_registry = false
       end
     end
 
@@ -74,8 +75,6 @@ RSpec.describe RailsCron::Backend::DispatchLogging do
         RailsCron.configuration.enable_log_dispatch_registry = true
 
         expect { adapter.log_dispatch_attempt('railscron:dispatch:job:1234567890') }.not_to raise_error
-
-        RailsCron.configuration.enable_log_dispatch_registry = false
       end
     end
 
@@ -96,8 +95,6 @@ RSpec.describe RailsCron::Backend::DispatchLogging do
           anything, # node_id (hostname)
           'dispatched'
         )
-
-        RailsCron.configuration.enable_log_dispatch_registry = false
       end
     end
   end

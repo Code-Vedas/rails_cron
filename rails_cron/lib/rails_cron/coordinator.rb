@@ -272,7 +272,7 @@ module RailsCron
       logger&.info("Starting missed-run recovery for window: #{recovery_start} to #{recovery_end}")
 
       total_recovered = 0
-      @registry.each do |entry|
+      each_enabled_entry do |entry|
         recovered = recover_entry(entry, recovery_start, recovery_end)
         total_recovered += recovered
       end

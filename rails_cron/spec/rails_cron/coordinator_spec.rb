@@ -1404,6 +1404,23 @@ RSpec.describe RailsCron::Coordinator do
       expect(coordinator).to have_received(:recover_entry).twice
     end
 
+    it 'does not recover disabled persisted definitions' do
+      configuration.enable_dispatch_recovery = true
+      configuration.recovery_startup_jitter = 0
+      registry.add(key: 'job:disabled', cron: '* * * * *', enqueue: kw_enqueue)
+      definition_registry = instance_double(
+        RailsCron::Definition::Registry,
+        enabled_definitions: [],
+        all_definitions: [{ key: 'job:disabled', cron: '* * * * *', enabled: false }]
+      )
+      allow(RailsCron).to receive(:definition_registry).and_return(definition_registry)
+      allow(coordinator).to receive(:recover_entry)
+
+      coordinator.send(:recover_missed_runs)
+
+      expect(coordinator).not_to have_received(:recover_entry)
+    end
+
     it 'logs recovery start with window information' do
       configuration.enable_dispatch_recovery = true
       configuration.recovery_startup_jitter = 0
