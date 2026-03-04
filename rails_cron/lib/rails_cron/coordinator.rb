@@ -368,23 +368,24 @@ module RailsCron
     end
 
     def each_enabled_entry(&)
-      definition_registry = RailsCron.definition_registry
-      return each_registry_entry(&) unless definition_registry
+      use_registry_entries = false
+      logger = @configuration.logger
+      warn_iteration_failure = ->(target, error) { logger&.warn("Failed to iterate #{target}: #{error.message}") }
 
-      definitions = definition_registry.all_definitions
-      return each_registry_entry(&) if definitions.empty?
+      begin
+        definition_registry = RailsCron.definition_registry
+        definitions = definition_registry&.all_definitions || []
+        use_registry_entries = definitions.empty?
 
-      definitions.each do |definition|
-        next unless definition[:enabled]
-
-        entry = build_entry_from_definition(definition)
-        next unless entry
-
-        yield(entry)
+        definitions
+          .filter_map { |definition| build_entry_from_definition(definition) if definition[:enabled] }
+          .each(&)
+      rescue StandardError => e
+        warn_iteration_failure.call('enabled definitions', e)
+        use_registry_entries = true
       end
-    rescue StandardError => e
-      @configuration.logger&.warn("Failed to iterate enabled definitions: #{e.message}")
-      each_registry_entry(&)
+
+      each_registry_entry(&) if use_registry_entries
     end
 
     def build_entry_from_definition(definition)
