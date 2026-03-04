@@ -75,7 +75,7 @@ RailsCron.configure do |c|
 
   c.tick_interval    = 5      # seconds between scheduler ticks
   c.window_lookback  = 120    # recover missed runs (seconds)
-  c.lease_ttl        = 60     # lease TTL in seconds
+  c.lease_ttl        = 125    # must be >= window_lookback + tick_interval
   c.recovery_window = 3600
   c.enable_dispatch_recovery = true
   c.enable_log_dispatch_registry = false

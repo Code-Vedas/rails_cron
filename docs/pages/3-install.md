@@ -73,7 +73,8 @@ RailsCron.configure do |c|
   c.window_lookback  = 120
 
   # Lease duration for distributed coordination (seconds)
-  c.lease_ttl        = 60
+  # Keep this >= window_lookback + tick_interval to prevent duplicate dispatch.
+  c.lease_ttl        = 125
 
   # Startup recovery window (seconds)
   c.recovery_window = 3600

@@ -16,7 +16,8 @@ RailsCron.configure do |config|
 
   config.tick_interval = 5
   config.window_lookback = 120
-  config.lease_ttl = 60
+  # Keep lease_ttl >= window_lookback + tick_interval to prevent duplicate dispatch.
+  config.lease_ttl = 125
   config.recovery_window = 3600
   config.enable_dispatch_recovery = true
   config.enable_log_dispatch_registry = false
