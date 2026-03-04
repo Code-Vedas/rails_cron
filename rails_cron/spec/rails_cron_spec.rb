@@ -201,6 +201,7 @@ RSpec.describe RailsCron do
     it 'rolls back definition when registry add fails' do
       definition_registry = instance_double(RailsCron::Definition::Registry)
       allow(described_class).to receive(:definition_registry).and_return(definition_registry)
+      allow(definition_registry).to receive(:find_definition).and_return(nil)
       allow(definition_registry).to receive(:upsert_definition)
       allow(definition_registry).to receive(:remove_definition)
       allow(described_class.registry).to receive(:add).and_raise(StandardError, 'registry failure')
@@ -220,6 +221,7 @@ RSpec.describe RailsCron do
       definition_registry = instance_double(RailsCron::Definition::Registry)
       allow(described_class).to receive(:definition_registry).and_return(definition_registry)
       allow(definition_registry).to receive(:upsert_definition).and_raise(StandardError, 'upsert failure')
+      allow(definition_registry).to receive(:find_definition).and_return(nil)
       allow(definition_registry).to receive(:remove_definition)
 
       expect do
@@ -231,6 +233,35 @@ RSpec.describe RailsCron do
       end.to raise_error(StandardError, 'upsert failure')
 
       expect(definition_registry).not_to have_received(:remove_definition)
+    end
+
+    it 'preserves existing persisted attributes when re-registering a definition' do
+      definition_registry = instance_double(RailsCron::Definition::Registry)
+      existing_definition = {
+        key: 'job:managed',
+        cron: '0 8 * * *',
+        enabled: false,
+        source: 'api',
+        metadata: { owner: 'ops' }
+      }
+
+      allow(described_class).to receive(:definition_registry).and_return(definition_registry)
+      allow(definition_registry).to receive(:find_definition).with('job:managed').and_return(existing_definition)
+      allow(definition_registry).to receive(:upsert_definition)
+
+      described_class.register(
+        key: 'job:managed',
+        cron: '0 9 * * *',
+        enqueue: ->(fire_time:, idempotency_key:) {}
+      )
+
+      expect(definition_registry).to have_received(:upsert_definition).with(
+        key: 'job:managed',
+        cron: '0 9 * * *',
+        enabled: false,
+        source: 'api',
+        metadata: { owner: 'ops' }
+      )
     end
   end
 
