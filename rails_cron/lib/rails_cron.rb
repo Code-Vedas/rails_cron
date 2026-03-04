@@ -189,7 +189,7 @@ module RailsCron
           source: existing_definition[:source],
           metadata: existing_definition[:metadata]
         )
-      else
+      elsif !registry.registered?(key)
         definition_registry.remove_definition(key)
       end
     end

@@ -396,7 +396,7 @@ module RailsCron
         return nil
       end
 
-      Registry::Entry.new(key: key, cron: definition[:cron], enqueue: callback_entry.enqueue)
+      Registry::Entry.new(key: key, cron: definition[:cron], enqueue: callback_entry.enqueue).freeze
     end
 
     def dispatch_work(entry, fire_time)
