@@ -8,26 +8,26 @@
 require 'securerandom'
 
 module IntegrationLockHelper
-  def configure_lock_adapter(adapter_instance, adapter_label)
-    @previous_lock_adapter = RailsCron.lock_adapter
+  def configure_backend(adapter_instance, adapter_label)
+    @previous_backend = RailsCron.backend
     @previous_db_config = ActiveRecord::Base.connection_db_config
 
     configure_database(adapter_label)
     RailsCron.configure do |config|
-      config.lock_adapter = adapter_instance
+      config.backend = adapter_instance
     end
   end
 
-  def restore_lock_adapter
+  def restore_backend
     RailsCron.configure do |config|
-      config.lock_adapter = @previous_lock_adapter
+      config.backend = @previous_backend
     end
 
     ActiveRecord::Base.establish_connection(@previous_db_config) if @previous_db_config
   end
 
-  def lock_adapter
-    RailsCron.lock_adapter
+  def backend
+    RailsCron.backend
   end
 
   def integration_key_prefix(label)
@@ -59,7 +59,7 @@ module IntegrationLockHelper
     return if %w[pg mysql].include?(label)
 
     integration_used_keys(label).each do |key|
-      lock_adapter.release(key)
+      backend.release(key)
     rescue StandardError
       # Ignore cleanup failures for expired or foreign locks.
     end
@@ -68,16 +68,16 @@ module IntegrationLockHelper
 
   def with_held_lock(key, ttl: 30, hold_for: 0.1)
     # PostgreSQL and MySQL adapters require connection pool handling for separate connections
-    thread = if [RailsCron::Lock::PostgresAdapter, RailsCron::Lock::MySQLAdapter].any? { |klass| lock_adapter.is_a?(klass) }
+    thread = if [RailsCron::Backend::PostgresAdapter, RailsCron::Backend::MySQLAdapter].any? { |klass| backend.is_a?(klass) }
                Thread.new do
                  ActiveRecord::Base.connection_pool.with_connection do
-                   adapter_class = lock_adapter.class
+                   adapter_class = backend.class
                    adapter_class.new.with_lock(key, ttl: ttl) { sleep hold_for }
                  end
                end
              else
                Thread.new do
-                 lock_adapter.with_lock(key, ttl: ttl) { sleep hold_for }
+                 backend.with_lock(key, ttl: ttl) { sleep hold_for }
                end
              end
 

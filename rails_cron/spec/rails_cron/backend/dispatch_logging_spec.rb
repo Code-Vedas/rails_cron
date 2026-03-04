@@ -7,11 +7,11 @@
 
 require 'spec_helper'
 
-RSpec.describe RailsCron::Lock::DispatchLogging do
+RSpec.describe RailsCron::Backend::DispatchLogging do
   # Test class that includes the DispatchLogging module
   let(:test_class_with_registry) do
     Class.new do
-      include RailsCron::Lock::DispatchLogging
+      include RailsCron::Backend::DispatchLogging
 
       attr_accessor :registry
 
@@ -24,7 +24,7 @@ RSpec.describe RailsCron::Lock::DispatchLogging do
   # Test class WITHOUT dispatch_registry method
   let(:test_class_without_registry) do
     Class.new do
-      include RailsCron::Lock::DispatchLogging
+      include RailsCron::Backend::DispatchLogging
     end
   end
 
@@ -62,6 +62,18 @@ RSpec.describe RailsCron::Lock::DispatchLogging do
       end
     end
 
+    context 'when dispatch registry is nil' do
+      it 'returns without attempting to log' do
+        adapter = test_class_with_registry.new
+        allow(adapter).to receive(:dispatch_registry).and_return(nil)
+        RailsCron.configuration.enable_log_dispatch_registry = true
+
+        expect { adapter.log_dispatch_attempt('railscron:dispatch:job:1234567890') }.not_to raise_error
+
+        RailsCron.configuration.enable_log_dispatch_registry = false
+      end
+    end
+
     context 'when logging succeeds' do
       it 'parses lock key and calls dispatch_registry' do
         adapter = test_class_with_registry.new
@@ -85,26 +97,23 @@ RSpec.describe RailsCron::Lock::DispatchLogging do
     end
   end
 
-  describe '#parse_lock_key' do
+  describe '.parse_lock_key' do
     it 'parses a standard lock key correctly' do
-      adapter = test_class_with_registry.new
-      cron_key, fire_time = adapter.parse_lock_key('railscron:dispatch:daily_report:1609459200')
+      cron_key, fire_time = described_class.parse_lock_key('railscron:dispatch:daily_report:1609459200')
 
       expect(cron_key).to eq('daily_report')
       expect(fire_time).to eq(Time.at(1_609_459_200))
     end
 
     it 'handles cron keys with colons' do
-      adapter = test_class_with_registry.new
-      cron_key, fire_time = adapter.parse_lock_key('myapp:dispatch:jobs:daily:report:1609459200')
+      cron_key, fire_time = described_class.parse_lock_key('myapp:dispatch:jobs:daily:report:1609459200')
 
       expect(cron_key).to eq('jobs:daily:report')
       expect(fire_time).to eq(Time.at(1_609_459_200))
     end
 
     it 'handles simple cron keys' do
-      adapter = test_class_with_registry.new
-      cron_key, fire_time = adapter.parse_lock_key('app:dispatch:job:1234567890')
+      cron_key, fire_time = described_class.parse_lock_key('app:dispatch:job:1234567890')
 
       expect(cron_key).to eq('job')
       expect(fire_time).to eq(Time.at(1_234_567_890))

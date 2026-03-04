@@ -69,6 +69,22 @@ RSpec.describe RailsCron do
       described_class.register(key: 'job:one', cron: '0 9 * * *', enqueue: ->(fire_time:, idempotency_key:) {})
       expect { described_class.reset_registry! }.to change { described_class.registry.size }.from(1).to(0)
     end
+
+    it 'clears fallback definition registry when present' do
+      fallback_registry = instance_double(RailsCron::Definition::MemoryEngine)
+      allow(fallback_registry).to receive(:clear)
+      described_class.instance_variable_set(:@definition_registry, fallback_registry)
+
+      described_class.reset_registry!
+
+      expect(fallback_registry).to have_received(:clear)
+    end
+
+    it 'does not call clear when definition registry is nil' do
+      described_class.instance_variable_set(:@definition_registry, nil)
+
+      expect { described_class.reset_registry! }.not_to raise_error
+    end
   end
 
   describe '.configure' do
@@ -101,9 +117,9 @@ RSpec.describe RailsCron do
       end
     end
 
-    it 'reads lock_adapter' do
-      described_class.configuration.lock_adapter = adapter
-      expect(described_class.lock_adapter).to be(adapter)
+    it 'reads backend' do
+      described_class.configuration.backend = adapter
+      expect(described_class.backend).to be(adapter)
     end
 
     it 'reads logger' do
@@ -127,9 +143,9 @@ RSpec.describe RailsCron do
       end
     end
 
-    it 'writes lock_adapter' do
-      described_class.lock_adapter = adapter
-      expect(described_class.configuration.lock_adapter).to be(adapter)
+    it 'writes backend' do
+      described_class.backend = adapter
+      expect(described_class.configuration.backend).to be(adapter)
     end
 
     it 'writes logger' do
@@ -173,6 +189,32 @@ RSpec.describe RailsCron do
 
       expect(&register).to change(described_class.registry, :size).from(0).to(1)
     end
+
+    it 'raises RegistryError when key already exists' do
+      described_class.register(key: 'job:one', cron: '* * * * *', enqueue: ->(fire_time:, idempotency_key:) {})
+
+      expect do
+        described_class.register(key: 'job:one', cron: '0 9 * * *', enqueue: ->(fire_time:, idempotency_key:) {})
+      end.to raise_error(RailsCron::RegistryError, /already registered/)
+    end
+
+    it 'rolls back definition when registry add fails' do
+      definition_registry = instance_double(RailsCron::Definition::Registry)
+      allow(described_class).to receive(:definition_registry).and_return(definition_registry)
+      allow(definition_registry).to receive(:upsert_definition)
+      allow(definition_registry).to receive(:remove_definition)
+      allow(described_class.registry).to receive(:add).and_raise(StandardError, 'registry failure')
+
+      expect do
+        described_class.register(
+          key: 'job:rollback',
+          cron: '0 9 * * *',
+          enqueue: ->(fire_time:, idempotency_key:) {}
+        )
+      end.to raise_error(StandardError, 'registry failure')
+
+      expect(definition_registry).to have_received(:remove_definition).with('job:rollback')
+    end
   end
 
   describe '.unregister' do
@@ -196,6 +238,22 @@ RSpec.describe RailsCron do
     it 'returns empty array when no entries' do
       expect(described_class.registered).to eq([])
     end
+
+    it 'returns definitions even when callback is missing from in-memory registry' do
+      described_class.definition_registry.upsert_definition(
+        key: 'job:definition-only',
+        cron: '0 11 * * *',
+        enabled: true,
+        source: 'code',
+        metadata: {}
+      )
+
+      result = described_class.registered
+
+      expect(result.size).to eq(1)
+      expect(result.first.key).to eq('job:definition-only')
+      expect(result.first.enqueue).to be_nil
+    end
   end
 
   describe '.registered?' do
@@ -206,6 +264,60 @@ RSpec.describe RailsCron do
 
     it 'returns false when key is not registered' do
       expect(described_class.registered?(key: 'job:missing')).to be(false)
+    end
+  end
+
+  describe '.enable/.disable' do
+    it 'delegates to definition registry enable_definition' do
+      definition_registry = instance_double(RailsCron::Definition::Registry)
+      allow(described_class).to receive(:definition_registry).and_return(definition_registry)
+      allow(definition_registry).to receive(:enable_definition).with('job:one').and_return({ key: 'job:one', enabled: true })
+
+      result = described_class.enable(key: 'job:one')
+
+      expect(result).to eq({ key: 'job:one', enabled: true })
+      expect(definition_registry).to have_received(:enable_definition).with('job:one')
+    end
+
+    it 'delegates to definition registry disable_definition' do
+      definition_registry = instance_double(RailsCron::Definition::Registry)
+      allow(described_class).to receive(:definition_registry).and_return(definition_registry)
+      allow(definition_registry).to receive(:disable_definition).with('job:one').and_return({ key: 'job:one', enabled: false })
+
+      result = described_class.disable(key: 'job:one')
+
+      expect(result).to eq({ key: 'job:one', enabled: false })
+      expect(definition_registry).to have_received(:disable_definition).with('job:one')
+    end
+  end
+
+  describe '.definition_registry' do
+    it 'uses backend provided definition registry when present' do
+      backend = instance_double(RailsCron::Backend::Adapter)
+      definition_registry = instance_double(RailsCron::Definition::Registry)
+      allow(backend).to receive(:definition_registry).and_return(definition_registry)
+      described_class.configuration.backend = backend
+
+      expect(described_class.definition_registry).to be(definition_registry)
+    end
+
+    it 'falls back to in-memory definition registry when backend returns nil' do
+      backend = instance_double(RailsCron::Backend::Adapter)
+      allow(backend).to receive(:definition_registry).and_return(nil)
+      described_class.configuration.backend = backend
+
+      expect(described_class.definition_registry).to be_a(RailsCron::Definition::MemoryEngine)
+    end
+
+    it 'falls back to in-memory definition registry when backend method is missing' do
+      backend = Class.new do
+        def definition_registry
+          raise NoMethodError
+        end
+      end.new
+      described_class.configuration.backend = backend
+
+      expect(described_class.definition_registry).to be_a(RailsCron::Definition::MemoryEngine)
     end
   end
 
@@ -444,23 +556,23 @@ RSpec.describe RailsCron do
 
   describe '.dispatched?' do
     it 'returns false when adapter is nil' do
-      described_class.configuration.lock_adapter = nil
+      described_class.configuration.backend = nil
 
       result = described_class.dispatched?('test:job', Time.current)
       expect(result).to be(false)
     end
 
     it 'returns false when adapter does not have dispatch_registry' do
-      adapter = instance_double(RailsCron::Lock::MemoryAdapter, respond_to?: false)
-      described_class.configuration.lock_adapter = adapter
+      adapter = instance_double(RailsCron::Backend::MemoryAdapter, respond_to?: false)
+      described_class.configuration.backend = adapter
 
       result = described_class.dispatched?('test:job', Time.current)
       expect(result).to be(false)
     end
 
     it 'returns false when registry returns nil' do
-      adapter = instance_double(RailsCron::Lock::MemoryAdapter, dispatch_registry: nil)
-      described_class.configuration.lock_adapter = adapter
+      adapter = instance_double(RailsCron::Backend::MemoryAdapter, dispatch_registry: nil)
+      described_class.configuration.backend = adapter
 
       result = described_class.dispatched?('test:job', Time.current)
       expect(result).to be(false)
@@ -468,11 +580,11 @@ RSpec.describe RailsCron do
 
     it 'returns the result from dispatch_registry.dispatched?' do
       registry = instance_double(RailsCron::Dispatch::Registry)
-      adapter = instance_double(RailsCron::Lock::MemoryAdapter, dispatch_registry: registry)
+      adapter = instance_double(RailsCron::Backend::MemoryAdapter, dispatch_registry: registry)
       fire_time = Time.current
 
       allow(registry).to receive(:dispatched?).with('test:job', fire_time).and_return(true)
-      described_class.configuration.lock_adapter = adapter
+      described_class.configuration.backend = adapter
 
       result = described_class.dispatched?('test:job', fire_time)
       expect(result).to be(true)
@@ -480,11 +592,11 @@ RSpec.describe RailsCron do
 
     it 'returns false when registry.dispatched? returns false' do
       registry = instance_double(RailsCron::Dispatch::Registry)
-      adapter = instance_double(RailsCron::Lock::MemoryAdapter, dispatch_registry: registry)
+      adapter = instance_double(RailsCron::Backend::MemoryAdapter, dispatch_registry: registry)
       fire_time = Time.current
 
       allow(registry).to receive(:dispatched?).with('test:job', fire_time).and_return(false)
-      described_class.configuration.lock_adapter = adapter
+      described_class.configuration.backend = adapter
 
       result = described_class.dispatched?('test:job', fire_time)
       expect(result).to be(false)
@@ -492,11 +604,11 @@ RSpec.describe RailsCron do
 
     it 'returns false and logs when adapter.dispatch_registry raises' do
       logger = instance_double(Logger, warn: nil)
-      adapter = instance_double(RailsCron::Lock::MemoryAdapter, respond_to?: true)
+      adapter = instance_double(RailsCron::Backend::MemoryAdapter, respond_to?: true)
       fire_time = Time.current
 
       allow(adapter).to receive(:dispatch_registry).and_raise(StandardError, 'backend error')
-      described_class.configuration.lock_adapter = adapter
+      described_class.configuration.backend = adapter
       described_class.configuration.logger = logger
 
       result = described_class.dispatched?('test:job', fire_time)
@@ -507,11 +619,11 @@ RSpec.describe RailsCron do
     it 'returns false and logs when registry.dispatched? raises' do
       logger = instance_double(Logger, warn: nil)
       registry = instance_double(RailsCron::Dispatch::Registry)
-      adapter = instance_double(RailsCron::Lock::MemoryAdapter, dispatch_registry: registry)
+      adapter = instance_double(RailsCron::Backend::MemoryAdapter, dispatch_registry: registry)
       fire_time = Time.current
 
       allow(registry).to receive(:dispatched?).and_raise(StandardError, 'database error')
-      described_class.configuration.lock_adapter = adapter
+      described_class.configuration.backend = adapter
       described_class.configuration.logger = logger
 
       result = described_class.dispatched?('test:job', fire_time)
@@ -521,11 +633,11 @@ RSpec.describe RailsCron do
 
     it 'returns false when logger is nil' do
       registry = instance_double(RailsCron::Dispatch::Registry)
-      adapter = instance_double(RailsCron::Lock::MemoryAdapter, dispatch_registry: registry)
+      adapter = instance_double(RailsCron::Backend::MemoryAdapter, dispatch_registry: registry)
       fire_time = Time.current
 
       allow(registry).to receive(:dispatched?).and_raise(StandardError, 'error')
-      described_class.configuration.lock_adapter = adapter
+      described_class.configuration.backend = adapter
       described_class.configuration.logger = nil
 
       result = described_class.dispatched?('test:job', fire_time)
@@ -535,23 +647,23 @@ RSpec.describe RailsCron do
 
   describe '.dispatch_log_registry' do
     it 'returns nil when adapter is nil' do
-      described_class.configuration.lock_adapter = nil
+      described_class.configuration.backend = nil
 
       result = described_class.dispatch_log_registry
       expect(result).to be_nil
     end
 
     it 'returns nil when adapter does not have dispatch_registry' do
-      adapter = instance_double(RailsCron::Lock::MemoryAdapter, respond_to?: false)
-      described_class.configuration.lock_adapter = adapter
+      adapter = instance_double(RailsCron::Backend::MemoryAdapter, respond_to?: false)
+      described_class.configuration.backend = adapter
 
       result = described_class.dispatch_log_registry
       expect(result).to be_nil
     end
 
     it 'returns nil when dispatch_registry returns nil' do
-      adapter = instance_double(RailsCron::Lock::MemoryAdapter, dispatch_registry: nil)
-      described_class.configuration.lock_adapter = adapter
+      adapter = instance_double(RailsCron::Backend::MemoryAdapter, dispatch_registry: nil)
+      described_class.configuration.backend = adapter
 
       result = described_class.dispatch_log_registry
       expect(result).to be_nil
@@ -559,8 +671,8 @@ RSpec.describe RailsCron do
 
     it 'returns the dispatch_registry from the adapter' do
       registry = instance_double(RailsCron::Dispatch::Registry)
-      adapter = instance_double(RailsCron::Lock::MemoryAdapter, dispatch_registry: registry)
-      described_class.configuration.lock_adapter = adapter
+      adapter = instance_double(RailsCron::Backend::MemoryAdapter, dispatch_registry: registry)
+      described_class.configuration.backend = adapter
 
       result = described_class.dispatch_log_registry
       expect(result).to eq(registry)
@@ -568,10 +680,10 @@ RSpec.describe RailsCron do
 
     it 'returns nil and logs when adapter.dispatch_registry raises' do
       logger = instance_double(Logger, warn: nil)
-      adapter = instance_double(RailsCron::Lock::MemoryAdapter, respond_to?: true)
+      adapter = instance_double(RailsCron::Backend::MemoryAdapter, respond_to?: true)
 
       allow(adapter).to receive(:dispatch_registry).and_raise(StandardError, 'backend error')
-      described_class.configuration.lock_adapter = adapter
+      described_class.configuration.backend = adapter
       described_class.configuration.logger = logger
 
       result = described_class.dispatch_log_registry
@@ -580,10 +692,10 @@ RSpec.describe RailsCron do
     end
 
     it 'returns nil when logger is nil' do
-      adapter = instance_double(RailsCron::Lock::MemoryAdapter, respond_to?: true)
+      adapter = instance_double(RailsCron::Backend::MemoryAdapter, respond_to?: true)
 
       allow(adapter).to receive(:dispatch_registry).and_raise(StandardError, 'database error')
-      described_class.configuration.lock_adapter = adapter
+      described_class.configuration.backend = adapter
       described_class.configuration.logger = nil
 
       result = described_class.dispatch_log_registry

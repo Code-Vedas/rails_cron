@@ -7,7 +7,7 @@
 
 require 'spec_helper'
 
-RSpec.describe RailsCron::Lock::MemoryAdapter do
+RSpec.describe RailsCron::Backend::MemoryAdapter do
   let(:adapter) { described_class.new }
 
   describe 'initialization' do
@@ -22,6 +22,10 @@ RSpec.describe RailsCron::Lock::MemoryAdapter do
 
     it 'returns a MemoryEngine for dispatch_registry' do
       expect(adapter.dispatch_registry).to be_a(RailsCron::Dispatch::MemoryEngine)
+    end
+
+    it 'returns a MemoryEngine for definition_registry' do
+      expect(adapter.definition_registry).to be_a(RailsCron::Definition::MemoryEngine)
     end
   end
 

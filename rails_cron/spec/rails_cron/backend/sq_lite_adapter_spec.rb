@@ -7,7 +7,7 @@
 
 require 'rails_helper'
 
-describe RailsCron::Lock::SQLiteAdapter do
+describe RailsCron::Backend::SQLiteAdapter do
   let(:adapter) { described_class.new }
 
   before do
@@ -26,6 +26,10 @@ describe RailsCron::Lock::SQLiteAdapter do
 
     it 'returns a DatabaseEngine for dispatch_registry' do
       expect(adapter.dispatch_registry).to be_a(RailsCron::Dispatch::DatabaseEngine)
+    end
+
+    it 'returns a DatabaseEngine for definition_registry' do
+      expect(adapter.definition_registry).to be_a(RailsCron::Definition::DatabaseEngine)
     end
   end
 
@@ -63,7 +67,7 @@ describe RailsCron::Lock::SQLiteAdapter do
 
       expect do
         adapter.acquire('test:key:error', 60)
-      end.to raise_error(RailsCron::Lock::LockAdapterError, /SQLite acquire failed/)
+      end.to raise_error(RailsCron::Backend::LockAdapterError, /SQLite acquire failed/)
     end
 
     it 'allows reacquiring after lock expires' do
@@ -182,7 +186,7 @@ describe RailsCron::Lock::SQLiteAdapter do
 
       expect do
         adapter.release('test:key:error')
-      end.to raise_error(RailsCron::Lock::LockAdapterError, /SQLite release failed/)
+      end.to raise_error(RailsCron::Backend::LockAdapterError, /SQLite release failed/)
     end
   end
 

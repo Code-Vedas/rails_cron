@@ -23,6 +23,10 @@ RSpec.describe RailsCron::Coordinator do
   end
   let(:registry) { RailsCron::Registry.new }
 
+  before do
+    allow(RailsCron).to receive(:definition_registry).and_return(nil)
+  end
+
   # Helper method to create an enqueue proc that accepts keyword arguments
   def kw_enqueue(&block)
     lambda do |fire_time:, idempotency_key:|
@@ -388,7 +392,7 @@ RSpec.describe RailsCron::Coordinator do
     it 'acquires lock when fire_time is in the past' do
       entry = instance_double(RailsCron::Registry::Entry, key: 'job', enqueue: kw_enqueue)
       adapter = double
-      configuration.lock_adapter = adapter
+      configuration.backend = adapter
       allow(adapter).to receive(:acquire).and_return(true)
 
       coordinator.send(:dispatch_if_due, entry, Time.now - 1, Time.now)
@@ -400,7 +404,7 @@ RSpec.describe RailsCron::Coordinator do
       call_count = [0]
       entry = instance_double(RailsCron::Registry::Entry, key: 'job', enqueue: kw_enqueue { call_count[0] += 1 })
       adapter = double
-      configuration.lock_adapter = adapter
+      configuration.backend = adapter
       allow(adapter).to receive(:acquire).and_return(true)
 
       coordinator.send(:dispatch_if_due, entry, Time.now - 1, Time.now)
@@ -411,7 +415,7 @@ RSpec.describe RailsCron::Coordinator do
     it 'logs lock failure when lock is not acquired' do
       entry = instance_double(RailsCron::Registry::Entry, key: 'job', enqueue: kw_enqueue)
       adapter = double
-      configuration.lock_adapter = adapter
+      configuration.backend = adapter
       allow(adapter).to receive(:acquire).and_return(false)
 
       coordinator.send(:dispatch_if_due, entry, Time.now - 1, Time.now)
@@ -423,7 +427,7 @@ RSpec.describe RailsCron::Coordinator do
       entry = double
       allow(entry).to receive(:key).and_raise(StandardError, 'Key error')
       adapter = double
-      configuration.lock_adapter = adapter
+      configuration.backend = adapter
       allow(adapter).to receive(:acquire).and_return(true)
 
       coordinator.send(:dispatch_if_due, entry, Time.now - 1, Time.now)
@@ -435,7 +439,7 @@ RSpec.describe RailsCron::Coordinator do
       configuration.logger = nil
       entry = instance_double(RailsCron::Registry::Entry, key: 'job', enqueue: kw_enqueue { raise 'Error' })
       adapter = double
-      configuration.lock_adapter = adapter
+      configuration.backend = adapter
       allow(adapter).to receive(:acquire).and_return(true)
 
       expect { coordinator.send(:dispatch_if_due, entry, Time.now - 1, Time.now) }.not_to raise_error
@@ -444,14 +448,14 @@ RSpec.describe RailsCron::Coordinator do
 
   describe '#acquire_lock' do
     it 'returns true when no lock adapter' do
-      configuration.lock_adapter = nil
+      configuration.backend = nil
       result = coordinator.send(:acquire_lock, 'key')
       expect(result).to be true
     end
 
     it 'calls adapter.acquire when adapter exists' do
       adapter = double
-      configuration.lock_adapter = adapter
+      configuration.backend = adapter
       allow(adapter).to receive(:acquire).and_return(true)
 
       coordinator.send(:acquire_lock, 'test-lock')
@@ -461,7 +465,7 @@ RSpec.describe RailsCron::Coordinator do
 
     it 'returns the result from adapter' do
       adapter = double
-      configuration.lock_adapter = adapter
+      configuration.backend = adapter
       allow(adapter).to receive(:acquire).and_return(true)
 
       result = coordinator.send(:acquire_lock, 'key')
@@ -471,7 +475,7 @@ RSpec.describe RailsCron::Coordinator do
 
     it 'returns false when adapter.acquire fails' do
       adapter = double
-      configuration.lock_adapter = adapter
+      configuration.backend = adapter
       allow(adapter).to receive(:acquire).and_return(false)
 
       result = coordinator.send(:acquire_lock, 'key')
@@ -481,7 +485,7 @@ RSpec.describe RailsCron::Coordinator do
 
     it 'rescues StandardError and logs it' do
       adapter = double
-      configuration.lock_adapter = adapter
+      configuration.backend = adapter
       allow(adapter).to receive(:acquire).and_raise(StandardError, 'Redis error')
 
       result = coordinator.send(:acquire_lock, 'key')
@@ -493,12 +497,106 @@ RSpec.describe RailsCron::Coordinator do
     it 'rescues StandardError without logging when logger is nil' do
       configuration.logger = nil
       adapter = double
-      configuration.lock_adapter = adapter
+      configuration.backend = adapter
       allow(adapter).to receive(:acquire).and_raise(StandardError, 'Redis error')
 
       result = coordinator.send(:acquire_lock, 'key')
 
       expect(result).to be false
+    end
+  end
+
+  describe '#each_enabled_entry' do
+    it 'falls back to in-memory registry when definition registry is nil' do
+      registry.add(key: 'job:registry', cron: '* * * * *', enqueue: kw_enqueue)
+      allow(RailsCron).to receive(:definition_registry).and_return(nil)
+
+      yielded = []
+      coordinator.send(:each_enabled_entry) { |entry| yielded << entry.key }
+
+      expect(yielded).to eq(['job:registry'])
+    end
+
+    it 'iterates over enabled definitions and yields resolved entries' do
+      registry.add(key: 'job:one', cron: '* * * * *', enqueue: kw_enqueue)
+      definitions = [{ key: 'job:one', cron: '*/5 * * * *', enabled: true }]
+      definition_registry = instance_double(RailsCron::Definition::Registry, enabled_definitions: definitions)
+      allow(RailsCron).to receive(:definition_registry).and_return(definition_registry)
+
+      yielded = []
+      coordinator.send(:each_enabled_entry) { |entry| yielded << entry }
+
+      expect(yielded.size).to eq(1)
+      expect(yielded.first.key).to eq('job:one')
+      expect(yielded.first.cron).to eq('*/5 * * * *')
+    end
+
+    it 'warns and skips definitions with missing callback registrations' do
+      definition_registry = instance_double(
+        RailsCron::Definition::Registry,
+        enabled_definitions: [{ key: 'job:missing', cron: '* * * * *', enabled: true }]
+      )
+      allow(RailsCron).to receive(:definition_registry).and_return(definition_registry)
+
+      yielded = []
+      coordinator.send(:each_enabled_entry) { |entry| yielded << entry }
+
+      expect(yielded).to eq([])
+      expect(logger).to have_received(:warn).with(/No enqueue callback registered for definition 'job:missing'/)
+    end
+
+    it 'skips missing callback definitions without warning when logger is nil' do
+      configuration.logger = nil
+      definition_registry = instance_double(
+        RailsCron::Definition::Registry,
+        enabled_definitions: [{ key: 'job:missing-no-logger', cron: '* * * * *', enabled: true }]
+      )
+      allow(RailsCron).to receive(:definition_registry).and_return(definition_registry)
+
+      yielded = []
+      expect { coordinator.send(:each_enabled_entry) { |entry| yielded << entry } }.not_to raise_error
+      expect(yielded).to eq([])
+    end
+
+    it 'warns and skips definitions when callback exists but enqueue is nil' do
+      callback_entry = instance_double(RailsCron::Registry::Entry, enqueue: nil)
+      allow(registry).to receive(:find).with('job:nil-enqueue').and_return(callback_entry)
+      definition_registry = instance_double(
+        RailsCron::Definition::Registry,
+        enabled_definitions: [{ key: 'job:nil-enqueue', cron: '* * * * *', enabled: true }]
+      )
+      allow(RailsCron).to receive(:definition_registry).and_return(definition_registry)
+
+      yielded = []
+      coordinator.send(:each_enabled_entry) { |entry| yielded << entry }
+
+      expect(yielded).to eq([])
+      expect(logger).to have_received(:warn).with(/No enqueue callback registered for definition 'job:nil-enqueue'/)
+    end
+
+    it 'falls back to in-memory registry iteration when definition iteration fails' do
+      registry.add(key: 'job:fallback', cron: '* * * * *', enqueue: kw_enqueue)
+      definition_registry = instance_double(RailsCron::Definition::Registry)
+      allow(definition_registry).to receive(:enabled_definitions).and_raise(StandardError, 'boom')
+      allow(RailsCron).to receive(:definition_registry).and_return(definition_registry)
+
+      yielded = []
+      coordinator.send(:each_enabled_entry) { |entry| yielded << entry.key }
+
+      expect(yielded).to eq(['job:fallback'])
+      expect(logger).to have_received(:warn).with(/Failed to iterate enabled definitions: boom/)
+    end
+
+    it 'falls back to in-memory registry iteration when definition iteration fails and logger is nil' do
+      configuration.logger = nil
+      registry.add(key: 'job:fallback', cron: '* * * * *', enqueue: kw_enqueue)
+      definition_registry = instance_double(RailsCron::Definition::Registry)
+      allow(definition_registry).to receive(:enabled_definitions).and_raise(StandardError, 'boom')
+      allow(RailsCron).to receive(:definition_registry).and_return(definition_registry)
+
+      yielded = []
+      expect { coordinator.send(:each_enabled_entry) { |entry| yielded << entry.key } }.not_to raise_error
+      expect(yielded).to eq(['job:fallback'])
     end
   end
 
@@ -637,7 +735,7 @@ RSpec.describe RailsCron::Coordinator do
       now = Time.now.floor
       entry = instance_double(RailsCron::Registry::Entry, key: 'job', enqueue: kw_enqueue { call_count[0] += 1 })
       adapter = double
-      configuration.lock_adapter = adapter
+      configuration.backend = adapter
       allow(adapter).to receive(:acquire).and_return(true)
 
       coordinator.send(:dispatch_if_due, entry, now, now)
@@ -658,7 +756,7 @@ RSpec.describe RailsCron::Coordinator do
 
     it 'acquire_lock with real adapter return value' do
       adapter = double
-      configuration.lock_adapter = adapter
+      configuration.backend = adapter
       allow(adapter).to receive(:acquire).and_return(true)
 
       result = coordinator.send(:acquire_lock, 'lock-key')
@@ -669,7 +767,7 @@ RSpec.describe RailsCron::Coordinator do
 
     it 'acquire_lock passes lease_ttl to adapter' do
       adapter = double
-      configuration.lock_adapter = adapter
+      configuration.backend = adapter
       allow(adapter).to receive(:acquire).and_return(true)
 
       coordinator.send(:acquire_lock, 'test-key')
@@ -750,7 +848,7 @@ RSpec.describe RailsCron::Coordinator do
 
     it 'dispatch_if_due does not call lock if fire_time is future' do
       adapter = double
-      configuration.lock_adapter = adapter
+      configuration.backend = adapter
       allow(adapter).to receive(:acquire)
       entry = instance_double(RailsCron::Registry::Entry, key: 'job', enqueue: kw_enqueue)
       future_time = Time.now + 100
@@ -812,7 +910,7 @@ RSpec.describe RailsCron::Coordinator do
       entry = double
       allow(entry).to receive(:key).and_raise(StandardError, 'Key error')
       adapter = double
-      configuration.lock_adapter = adapter
+      configuration.backend = adapter
       allow(adapter).to receive(:acquire).and_return(true)
 
       coordinator.send(:dispatch_if_due, entry, Time.now - 1, Time.now)
@@ -822,7 +920,7 @@ RSpec.describe RailsCron::Coordinator do
 
     it 'acquire_lock with error recovery' do
       adapter = double
-      configuration.lock_adapter = adapter
+      configuration.backend = adapter
       allow(adapter).to receive(:acquire).and_raise(StandardError, 'Redis unreachable')
 
       result = coordinator.send(:acquire_lock, 'test-key')
@@ -909,7 +1007,7 @@ RSpec.describe RailsCron::Coordinator do
         configuration.logger = nil
         entry = instance_double(RailsCron::Registry::Entry, key: 'job', enqueue: kw_enqueue)
         adapter = double
-        configuration.lock_adapter = adapter
+        configuration.backend = adapter
         allow(adapter).to receive(:acquire).and_return(false)
 
         expect { coordinator.send(:dispatch_if_due, entry, Time.now - 1, Time.now) }.not_to raise_error
@@ -920,7 +1018,7 @@ RSpec.describe RailsCron::Coordinator do
         entry = double
         allow(entry).to receive(:key).and_raise(StandardError, 'Test error')
         adapter = double
-        configuration.lock_adapter = adapter
+        configuration.backend = adapter
         allow(adapter).to receive(:acquire).and_return(true)
 
         expect { coordinator.send(:dispatch_if_due, entry, Time.now - 1, Time.now) }.not_to raise_error
@@ -930,7 +1028,7 @@ RSpec.describe RailsCron::Coordinator do
     it 'dispatch_if_due with lock failure logs debug' do
       entry = instance_double(RailsCron::Registry::Entry, key: 'job', enqueue: kw_enqueue)
       adapter = double
-      configuration.lock_adapter = adapter
+      configuration.backend = adapter
       allow(adapter).to receive(:acquire).and_return(false)
 
       coordinator.send(:dispatch_if_due, entry, Time.now - 1, Time.now)
@@ -942,7 +1040,7 @@ RSpec.describe RailsCron::Coordinator do
       entry = double
       allow(entry).to receive(:key).and_raise(StandardError, 'Test error')
       adapter = double
-      configuration.lock_adapter = adapter
+      configuration.backend = adapter
       allow(adapter).to receive(:acquire).and_return(true)
 
       coordinator.send(:dispatch_if_due, entry, Time.now - 1, Time.now)
@@ -954,7 +1052,7 @@ RSpec.describe RailsCron::Coordinator do
       call_count = [0]
       entry = instance_double(RailsCron::Registry::Entry, key: 'job', cron: '* * * * *', enqueue: kw_enqueue { call_count[0] += 1 })
       adapter = double
-      configuration.lock_adapter = adapter
+      configuration.backend = adapter
       allow(adapter).to receive_messages(acquire: true, call: true)
 
       # Ensure window_lookback catches past occurrences so dispatch happens
@@ -1012,7 +1110,7 @@ RSpec.describe RailsCron::Coordinator do
       call_count = [0]
       entry = instance_double(RailsCron::Registry::Entry, key: 'job', enqueue: kw_enqueue { call_count[0] += 1 })
       adapter = double
-      configuration.lock_adapter = adapter
+      configuration.backend = adapter
       allow(adapter).to receive(:acquire).and_return(true)
       now = Time.now.floor
 
@@ -1044,7 +1142,7 @@ RSpec.describe RailsCron::Coordinator do
 
     it 'acquire_lock error logging with message' do
       adapter = double
-      configuration.lock_adapter = adapter
+      configuration.backend = adapter
       error_msg = 'Connection timeout'
       allow(adapter).to receive(:acquire).and_raise(StandardError, error_msg)
 
@@ -1130,7 +1228,7 @@ RSpec.describe RailsCron::Coordinator do
 
     it 'dispatch_if_due acquires correct lock key' do
       adapter = double
-      configuration.lock_adapter = adapter
+      configuration.backend = adapter
       allow(adapter).to receive_messages(acquire: true, call: true)
       entry = instance_double(RailsCron::Registry::Entry, key: 'test', enqueue: kw_enqueue)
       fire_time = Time.at(1000)
@@ -1143,7 +1241,7 @@ RSpec.describe RailsCron::Coordinator do
 
     it 'dispatch_if_due with fire_time equals now dispatches and logs' do
       adapter = double
-      configuration.lock_adapter = adapter
+      configuration.backend = adapter
       allow(adapter).to receive_messages(acquire: true)
 
       entry = instance_double(RailsCron::Registry::Entry, key: 'test', enqueue: kw_enqueue)
@@ -1170,7 +1268,7 @@ RSpec.describe RailsCron::Coordinator do
       # Ensure logger is present
       expect(configuration.logger).not_to be_nil
       adapter = double
-      configuration.lock_adapter = adapter
+      configuration.backend = adapter
       allow(adapter).to receive(:acquire).and_return(false)
       entry = instance_double(RailsCron::Registry::Entry, key: 'job', enqueue: kw_enqueue)
       lock_time = Time.now - 1
@@ -1188,7 +1286,7 @@ RSpec.describe RailsCron::Coordinator do
       entry = double
       allow(entry).to receive(:key).and_raise(StandardError, 'Test exception')
       adapter = double
-      configuration.lock_adapter = adapter
+      configuration.backend = adapter
       allow(adapter).to receive(:acquire).and_return(true)
 
       coordinator.send(:dispatch_if_due, entry, Time.now - 1, Time.now)
@@ -1340,7 +1438,7 @@ RSpec.describe RailsCron::Coordinator do
     it 'calls cleanup on dispatch registry when adapter responds to :dispatch_registry' do
       adapter = double
       registry_double = double
-      configuration.lock_adapter = adapter
+      configuration.backend = adapter
       allow(adapter).to receive(:respond_to?).with(:dispatch_registry).and_return(true)
       allow(adapter).to receive(:dispatch_registry).and_return(registry_double)
       allow(registry_double).to receive(:respond_to?).with(:cleanup).and_return(true)
@@ -1354,7 +1452,7 @@ RSpec.describe RailsCron::Coordinator do
     it 'logs cleaned up record count' do
       adapter = double
       registry_double = double
-      configuration.lock_adapter = adapter
+      configuration.backend = adapter
       allow(adapter).to receive(:respond_to?).with(:dispatch_registry).and_return(true)
       allow(adapter).to receive(:dispatch_registry).and_return(registry_double)
       allow(registry_double).to receive(:respond_to?).with(:cleanup).and_return(true)
@@ -1367,7 +1465,7 @@ RSpec.describe RailsCron::Coordinator do
 
     it 'handles cleanup errors gracefully' do
       adapter = double
-      configuration.lock_adapter = adapter
+      configuration.backend = adapter
       allow(adapter).to receive(:respond_to?).with(:dispatch_registry).and_return(true)
       allow(adapter).to receive(:dispatch_registry).and_raise(StandardError, 'Cleanup error')
 
@@ -1376,14 +1474,14 @@ RSpec.describe RailsCron::Coordinator do
     end
 
     it 'returns early if lock adapter is nil' do
-      configuration.lock_adapter = nil
+      configuration.backend = nil
 
       expect { coordinator.send(:cleanup_old_dispatch_records, 86_400) }.not_to raise_error
     end
 
     it 'returns early if dispatch_registry not supported' do
       adapter = double
-      configuration.lock_adapter = adapter
+      configuration.backend = adapter
       allow(adapter).to receive(:respond_to?).with(:dispatch_registry).and_return(false)
 
       expect { coordinator.send(:cleanup_old_dispatch_records, 86_400) }.not_to raise_error
@@ -1392,7 +1490,7 @@ RSpec.describe RailsCron::Coordinator do
     it 'returns early if cleanup method not supported' do
       adapter = double
       registry_double = double
-      configuration.lock_adapter = adapter
+      configuration.backend = adapter
       allow(adapter).to receive(:respond_to?).with(:dispatch_registry).and_return(true)
       allow(adapter).to receive(:dispatch_registry).and_return(registry_double)
       allow(registry_double).to receive(:respond_to?).with(:cleanup).and_return(false)
@@ -1403,7 +1501,7 @@ RSpec.describe RailsCron::Coordinator do
     it 'does not log when cleanup returns 0' do
       adapter = double
       registry_double = double
-      configuration.lock_adapter = adapter
+      configuration.backend = adapter
       allow(adapter).to receive(:respond_to?).with(:dispatch_registry).and_return(true)
       allow(adapter).to receive(:dispatch_registry).and_return(registry_double)
       allow(registry_double).to receive(:respond_to?).with(:cleanup).and_return(true)
@@ -1418,7 +1516,7 @@ RSpec.describe RailsCron::Coordinator do
     it 'skips cleanup if recovery_window is 0' do
       adapter = double
       registry_double = double
-      configuration.lock_adapter = adapter
+      configuration.backend = adapter
       allow(adapter).to receive(:respond_to?).with(:dispatch_registry).and_return(true)
       allow(adapter).to receive(:dispatch_registry).and_return(registry_double)
       allow(registry_double).to receive(:respond_to?).with(:cleanup).and_return(true)
@@ -1432,7 +1530,7 @@ RSpec.describe RailsCron::Coordinator do
     it 'works without logger when cleanup succeeds' do
       adapter = double
       registry_double = double
-      configuration.lock_adapter = adapter
+      configuration.backend = adapter
       configuration.logger = nil
       allow(adapter).to receive(:respond_to?).with(:dispatch_registry).and_return(true)
       allow(adapter).to receive(:dispatch_registry).and_return(registry_double)
@@ -1444,7 +1542,7 @@ RSpec.describe RailsCron::Coordinator do
 
     it 'works without logger when cleanup fails' do
       adapter = double
-      configuration.lock_adapter = adapter
+      configuration.backend = adapter
       configuration.logger = nil
       allow(adapter).to receive(:respond_to?).with(:dispatch_registry).and_return(true)
       allow(adapter).to receive(:dispatch_registry).and_raise(StandardError, 'Cleanup failed')
@@ -1582,7 +1680,7 @@ RSpec.describe RailsCron::Coordinator do
 
   describe '#already_dispatched?' do
     it 'returns false when lock adapter is nil' do
-      configuration.lock_adapter = nil
+      configuration.backend = nil
 
       result = coordinator.send(:already_dispatched?, 'test_job', Time.current)
 
@@ -1591,7 +1689,7 @@ RSpec.describe RailsCron::Coordinator do
 
     it 'returns false when lock adapter does not have dispatch_registry' do
       adapter = double
-      configuration.lock_adapter = adapter
+      configuration.backend = adapter
       allow(adapter).to receive(:respond_to?).with(:dispatch_registry).and_return(false)
 
       result = coordinator.send(:already_dispatched?, 'test_job', Time.current)
@@ -1602,7 +1700,7 @@ RSpec.describe RailsCron::Coordinator do
     it 'returns true when dispatch registry shows job was dispatched' do
       adapter = double
       registry_double = double
-      configuration.lock_adapter = adapter
+      configuration.backend = adapter
       allow(adapter).to receive(:respond_to?).with(:dispatch_registry).and_return(true)
       allow(adapter).to receive(:dispatch_registry).and_return(registry_double)
       allow(registry_double).to receive(:dispatched?).and_return(true)
@@ -1615,7 +1713,7 @@ RSpec.describe RailsCron::Coordinator do
     it 'returns false when dispatch registry shows job was not dispatched' do
       adapter = double
       registry_double = double
-      configuration.lock_adapter = adapter
+      configuration.backend = adapter
       allow(adapter).to receive(:respond_to?).with(:dispatch_registry).and_return(true)
       allow(adapter).to receive(:dispatch_registry).and_return(registry_double)
       allow(registry_double).to receive(:dispatched?).and_return(false)
@@ -1627,7 +1725,7 @@ RSpec.describe RailsCron::Coordinator do
 
     it 'handles errors gracefully and logs them' do
       adapter = double
-      configuration.lock_adapter = adapter
+      configuration.backend = adapter
       allow(adapter).to receive(:respond_to?).with(:dispatch_registry).and_return(true)
       allow(adapter).to receive(:dispatch_registry).and_raise(StandardError, 'Registry error')
 
@@ -1640,7 +1738,7 @@ RSpec.describe RailsCron::Coordinator do
     it 'works without logger' do
       configuration.logger = nil
       adapter = double
-      configuration.lock_adapter = adapter
+      configuration.backend = adapter
       allow(adapter).to receive(:respond_to?).with(:dispatch_registry).and_return(true)
       allow(adapter).to receive(:dispatch_registry).and_raise(StandardError, 'Registry error')
 

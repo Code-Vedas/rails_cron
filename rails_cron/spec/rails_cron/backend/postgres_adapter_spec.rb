@@ -7,7 +7,7 @@
 
 require 'spec_helper'
 
-RSpec.describe RailsCron::Lock::PostgresAdapter do
+RSpec.describe RailsCron::Backend::PostgresAdapter do
   let(:mock_connection) { instance_double(ActiveRecord::ConnectionAdapters::AbstractAdapter) }
   let(:adapter) { described_class.new }
 
@@ -27,6 +27,10 @@ RSpec.describe RailsCron::Lock::PostgresAdapter do
 
     it 'returns a DatabaseEngine for dispatch_registry' do
       expect(adapter.dispatch_registry).to be_a(RailsCron::Dispatch::DatabaseEngine)
+    end
+
+    it 'returns a DatabaseEngine for definition_registry' do
+      expect(adapter.definition_registry).to be_a(RailsCron::Definition::DatabaseEngine)
     end
   end
 
@@ -91,7 +95,7 @@ RSpec.describe RailsCron::Lock::PostgresAdapter do
 
       expect do
         adapter.acquire('lock-key', 60)
-      end.to raise_error(RailsCron::Lock::LockAdapterError, /PostgreSQL acquire failed/)
+      end.to raise_error(RailsCron::Backend::LockAdapterError, /PostgreSQL acquire failed/)
     end
 
     context 'with dispatch logging enabled' do
@@ -196,7 +200,7 @@ RSpec.describe RailsCron::Lock::PostgresAdapter do
 
       expect do
         adapter.release('lock-key')
-      end.to raise_error(RailsCron::Lock::LockAdapterError, /PostgreSQL release failed/)
+      end.to raise_error(RailsCron::Backend::LockAdapterError, /PostgreSQL release failed/)
     end
   end
 

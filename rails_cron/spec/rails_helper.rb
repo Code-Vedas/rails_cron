@@ -41,6 +41,7 @@ RSpec.configure do |config|
 
   config.before do
     RailsCron::CronDispatch.delete_all
+    RailsCron::CronDefinition.delete_all if defined?(RailsCron::CronDefinition)
   end
 end
 

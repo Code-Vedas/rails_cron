@@ -11,15 +11,15 @@ RSpec.describe 'Lock integration', integration: 'sqlite' do # rubocop:disable RS
   include IntegrationLockHelper
 
   let(:adapter_label) { 'sqlite' }
-  let(:adapter_instance) { RailsCron::Lock::SQLiteAdapter.new }
+  let(:adapter_instance) { RailsCron::Backend::SQLiteAdapter.new }
 
   before do
-    configure_lock_adapter(adapter_instance, adapter_label)
+    configure_backend(adapter_instance, adapter_label)
   end
 
   after do
     cleanup_lock_keys(adapter_label)
-    restore_lock_adapter
+    restore_backend
   end
 
   it_behaves_like 'lock adapter integration'

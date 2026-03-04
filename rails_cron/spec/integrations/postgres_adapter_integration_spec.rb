@@ -11,15 +11,15 @@ RSpec.describe 'Lock integration', integration: 'pg' do # rubocop:disable RSpec/
   include IntegrationLockHelper
 
   let(:adapter_label) { 'pg' }
-  let(:adapter_instance) { RailsCron::Lock::PostgresAdapter.new }
+  let(:adapter_instance) { RailsCron::Backend::PostgresAdapter.new }
 
   before do
-    configure_lock_adapter(adapter_instance, adapter_label)
+    configure_backend(adapter_instance, adapter_label)
   end
 
   after do
     cleanup_lock_keys(adapter_label)
-    restore_lock_adapter
+    restore_backend
   end
 
   it_behaves_like 'lock adapter integration'

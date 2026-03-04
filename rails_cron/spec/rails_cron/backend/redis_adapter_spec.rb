@@ -8,7 +8,7 @@
 require 'spec_helper'
 require 'fakeredis'
 
-RSpec.describe RailsCron::Lock::RedisAdapter do
+RSpec.describe RailsCron::Backend::RedisAdapter do
   let(:redis_client) { Redis.new }
   let(:adapter) { described_class.new(redis_client) }
 
@@ -23,7 +23,7 @@ RSpec.describe RailsCron::Lock::RedisAdapter do
 
   describe '#initialize' do
     it 'requires a redis client' do
-      expect { described_class.new(nil) }.to raise_error(ArgumentError, /redis client is required/)
+      expect { described_class.new(nil) }.to raise_error(ArgumentError, /redis client must respond to :set and :eval/)
     end
 
     it 'requires a client with set method' do
@@ -41,6 +41,10 @@ RSpec.describe RailsCron::Lock::RedisAdapter do
 
     it 'returns a RedisEngine for dispatch_registry' do
       expect(adapter.dispatch_registry).to be_a(RailsCron::Dispatch::RedisEngine)
+    end
+
+    it 'returns a RedisEngine for definition_registry' do
+      expect(adapter.definition_registry).to be_a(RailsCron::Definition::RedisEngine)
     end
   end
 
@@ -86,7 +90,7 @@ RSpec.describe RailsCron::Lock::RedisAdapter do
       allow(redis_client).to receive(:set).and_raise(StandardError, 'Connection failed')
 
       expect { adapter.acquire('key', 60) }.to raise_error(
-        RailsCron::Lock::LockAdapterError,
+        RailsCron::Backend::LockAdapterError,
         /Redis acquire failed/
       )
     end
@@ -198,7 +202,7 @@ RSpec.describe RailsCron::Lock::RedisAdapter do
       adapter.acquire('lock-key', 60)
 
       expect { adapter.release('lock-key') }.to raise_error(
-        RailsCron::Lock::LockAdapterError,
+        RailsCron::Backend::LockAdapterError,
         /Redis release failed/
       )
     end

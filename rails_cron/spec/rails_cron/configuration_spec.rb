@@ -20,7 +20,7 @@ RSpec.describe RailsCron::Configuration do
       window_lookahead: 0,
       lease_ttl: 125,
       namespace: 'railscron',
-      lock_adapter: nil,
+      backend: nil,
       logger: nil,
       time_zone: nil,
       enable_log_dispatch_registry: false,
@@ -51,8 +51,8 @@ RSpec.describe RailsCron::Configuration do
       expect(config.namespace).to eq('railscron')
     end
 
-    it 'defaults lock_adapter' do
-      expect(config.lock_adapter).to be_nil
+    it 'defaults backend' do
+      expect(config.backend).to be_nil
     end
 
     it 'defaults logger' do
@@ -90,9 +90,9 @@ RSpec.describe RailsCron::Configuration do
       expect(config.namespace).to eq('custom_namespace')
     end
 
-    it 'sets lock_adapter' do
-      config.lock_adapter = adapter
-      expect(config.lock_adapter).to be(adapter)
+    it 'sets backend' do
+      config.backend = adapter
+      expect(config.backend).to be(adapter)
     end
 
     it 'sets logger' do
@@ -244,9 +244,9 @@ RSpec.describe RailsCron::Configuration do
       expect(config.to_h[:namespace]).to eq('railscron')
     end
 
-    it 'includes lock_adapter class name when set' do
-      config.lock_adapter = adapter
-      expect(config.to_h[:lock_adapter]).to eq('Object')
+    it 'includes backend class name when set' do
+      config.backend = adapter
+      expect(config.to_h[:backend]).to eq('Object')
     end
 
     it 'includes logger class name when set' do

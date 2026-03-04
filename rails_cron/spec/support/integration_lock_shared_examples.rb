@@ -11,7 +11,7 @@ RSpec.shared_examples 'lock adapter integration' do
   it 'executes block and returns result when lock is acquired' do
     key = lock_key('job:single')
 
-    result = lock_adapter.with_lock(key, ttl: 30) { 'executed' }
+    result = backend.with_lock(key, ttl: 30) { 'executed' }
 
     expect(result).to eq('executed')
   end
@@ -20,7 +20,7 @@ RSpec.shared_examples 'lock adapter integration' do
     key = lock_key('job:contended')
 
     with_held_lock(key, ttl: 30, hold_for: 0.1) do
-      result = lock_adapter.with_lock(key, ttl: 30) { 'should_not_execute' }
+      result = backend.with_lock(key, ttl: 30) { 'should_not_execute' }
       expect(result).to be_nil
     end
   end
@@ -28,33 +28,33 @@ RSpec.shared_examples 'lock adapter integration' do
   it 'allows reacquisition after release' do
     key = lock_key('job:reacquire')
 
-    expect(lock_adapter.acquire(key, 30)).to be(true)
-    expect(lock_adapter.release(key)).to be(true)
-    expect(lock_adapter.acquire(key, 30)).to be(true)
+    expect(backend.acquire(key, 30)).to be(true)
+    expect(backend.release(key)).to be(true)
+    expect(backend.acquire(key, 30)).to be(true)
   ensure
-    lock_adapter.release(key)
+    backend.release(key)
   end
 
   it 'supports independent locks for different keys' do
     key_a = lock_key('job:a')
     key_b = lock_key('job:b')
 
-    expect(lock_adapter.acquire(key_a, 30)).to be(true)
-    expect(lock_adapter.acquire(key_b, 30)).to be(true)
+    expect(backend.acquire(key_a, 30)).to be(true)
+    expect(backend.acquire(key_b, 30)).to be(true)
   ensure
-    lock_adapter.release(key_a)
-    lock_adapter.release(key_b)
+    backend.release(key_a)
+    backend.release(key_b)
   end
 
   it 'releases lock even if block raises' do
     key = lock_key('job:error')
 
     expect do
-      lock_adapter.with_lock(key, ttl: 30) { raise 'integration error' }
+      backend.with_lock(key, ttl: 30) { raise 'integration error' }
     end.to raise_error('integration error')
 
-    expect(lock_adapter.acquire(key, 30)).to be(true)
+    expect(backend.acquire(key, 30)).to be(true)
   ensure
-    lock_adapter.release(key)
+    backend.release(key)
   end
 end

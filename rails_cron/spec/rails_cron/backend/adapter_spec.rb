@@ -8,7 +8,7 @@
 require 'spec_helper'
 
 # rubocop:disable RSpec/MultipleDescribes
-RSpec.describe RailsCron::Lock::Adapter do
+RSpec.describe RailsCron::Backend::Adapter do
   describe '#acquire' do
     it 'raises NotImplementedError when called directly on base class' do
       adapter = described_class.new
@@ -32,9 +32,17 @@ RSpec.describe RailsCron::Lock::Adapter do
       expect { adapter.with_lock('test-key', ttl: 60) { 42 } }.to raise_error(NotImplementedError)
     end
   end
+
+  describe '#definition_registry' do
+    it 'returns nil by default' do
+      adapter = described_class.new
+
+      expect(adapter.definition_registry).to be_nil
+    end
+  end
 end
 
-RSpec.describe RailsCron::Lock::NullAdapter do
+RSpec.describe RailsCron::Backend::NullAdapter do
   let(:adapter) { described_class.new }
 
   describe '#acquire' do

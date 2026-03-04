@@ -17,7 +17,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2) do
+ActiveRecord::Schema[7.2].define(version: 3) do
   create_table 'rails_cron_dispatches', force: :cascade do |t|
     t.datetime 'created_at', null: false
     t.datetime 'dispatched_at', null: false
@@ -39,5 +39,19 @@ ActiveRecord::Schema[7.2].define(version: 2) do
     t.datetime 'updated_at', null: false
     t.index ['expires_at'], name: 'index_rails_cron_locks_on_expires_at'
     t.index ['key'], name: 'index_rails_cron_locks_on_key', unique: true
+  end
+
+  create_table 'rails_cron_definitions', force: :cascade do |t|
+    t.string 'key', limit: 255, null: false
+    t.string 'cron', limit: 255, null: false
+    t.boolean 'enabled', default: true, null: false
+    t.string 'source', limit: 50, default: 'code', null: false
+    t.json 'metadata', default: {}, null: false
+    t.datetime 'disabled_at'
+    t.datetime 'created_at', null: false
+    t.datetime 'updated_at', null: false
+    t.index ['enabled'], name: 'index_rails_cron_definitions_on_enabled'
+    t.index ['key'], name: 'index_rails_cron_definitions_on_key', unique: true
+    t.index ['source'], name: 'index_rails_cron_definitions_on_source'
   end
 end

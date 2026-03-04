@@ -11,15 +11,15 @@ RSpec.describe 'Lock integration', integration: 'mysql' do # rubocop:disable RSp
   include IntegrationLockHelper
 
   let(:adapter_label) { 'mysql' }
-  let(:adapter_instance) { RailsCron::Lock::MySQLAdapter.new }
+  let(:adapter_instance) { RailsCron::Backend::MySQLAdapter.new }
 
   before do
-    configure_lock_adapter(adapter_instance, adapter_label)
+    configure_backend(adapter_instance, adapter_label)
   end
 
   after do
     cleanup_lock_keys(adapter_label)
-    restore_lock_adapter
+    restore_backend
   end
 
   it_behaves_like 'lock adapter integration'
