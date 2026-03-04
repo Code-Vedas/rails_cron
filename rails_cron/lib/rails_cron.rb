@@ -157,7 +157,12 @@ module RailsCron
       begin
         registry.add(key: key, cron: cron, enqueue: enqueue)
       rescue StandardError
-        rollback_registered_definition(key, existing_definition)
+        begin
+          rollback_registered_definition(key, existing_definition)
+        rescue StandardError => rollback_error
+          configuration.logger&.error("Failed to rollback persisted definition for #{key}: #{rollback_error.message}")
+        end
+
         raise
       end
     end
@@ -188,6 +193,7 @@ module RailsCron
         definition_registry.remove_definition(key)
       end
     end
+    private :rollback_registered_definition
 
     ##
     # Get all registered cron jobs.

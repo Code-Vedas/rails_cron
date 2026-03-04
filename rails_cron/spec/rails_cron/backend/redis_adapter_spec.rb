@@ -35,6 +35,16 @@ RSpec.describe RailsCron::Backend::RedisAdapter do
       expect(adapter).to be_a(described_class)
     end
 
+    it 'accepts redis-compatible clients exposed via respond_to_missing?' do
+      proxy_client = Class.new do
+        def respond_to_missing?(method_name, include_private = false)
+          %i[set eval].include?(method_name) || super
+        end
+      end.new
+
+      expect { described_class.new(proxy_client) }.not_to raise_error
+    end
+
     it 'has a dispatch_registry method' do
       expect(adapter).to respond_to(:dispatch_registry)
     end

@@ -44,6 +44,7 @@ detectors:
       - RailsCron#dispatch_log_registry
       - RailsCron#dispatched?
       - RailsCron::Backend::DispatchLogging#log_dispatch_attempt
+      - RailsCron::Backend::RedisAdapter#initialize
   UtilityFunction:
     enabled: true
     exclude:
@@ -55,6 +56,7 @@ detectors:
       - RailsCron::Dispatch::DatabaseEngine#log_dispatch
       - RailsCron::Dispatch::MemoryEngine#build_key
       - RailsCron::Dispatch::RedisEngine#convert_timestamps
+      - RailsCron::Backend::DispatchLogging#parse_lock_key
   FeatureEnvy:
     enabled: true
     exclude:

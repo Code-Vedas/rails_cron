@@ -38,8 +38,7 @@ module RailsCron
       # @raise [ArgumentError] if redis is not provided or does not implement the required interface
       def initialize(redis, namespace: 'railscron')
         super()
-        redis.method(:set)
-        redis.method(:eval)
+        raise ArgumentError, 'redis client must respond to :set and :eval' unless redis.respond_to?(:set) && redis.respond_to?(:eval)
 
         @redis = redis
         @namespace = namespace
@@ -49,8 +48,6 @@ module RailsCron
         # normal flow, release is never called (TTL is relied upon), so we must expire local entries.
         @lock_values = {}
         @mutex = Mutex.new
-      rescue NameError
-        raise ArgumentError, 'redis client must respond to :set and :eval'
       end
 
       ##

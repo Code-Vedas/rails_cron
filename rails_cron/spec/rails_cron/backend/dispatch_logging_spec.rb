@@ -124,4 +124,15 @@ RSpec.describe RailsCron::Backend::DispatchLogging do
       expect(fire_time).to eq(Time.at(1_234_567_890))
     end
   end
+
+  describe '#parse_lock_key' do
+    it 'delegates to the shared parser as an instance method' do
+      adapter = test_class_with_registry.new
+
+      cron_key, fire_time = adapter.parse_lock_key('railscron:dispatch:daily_report:1609459200')
+
+      expect(cron_key).to eq('daily_report')
+      expect(fire_time).to eq(Time.at(1_609_459_200))
+    end
+  end
 end

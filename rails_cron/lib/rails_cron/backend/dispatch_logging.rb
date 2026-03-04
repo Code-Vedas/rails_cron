@@ -44,7 +44,7 @@ module RailsCron
         registry = dispatch_registry
         return unless registry
 
-        cron_key, fire_time = DispatchLogging.parse_lock_key(key)
+        cron_key, fire_time = parse_lock_key(key)
         node_id = Socket.gethostname
 
         registry.log_dispatch(cron_key, fire_time, node_id, 'dispatched')
@@ -61,6 +61,10 @@ module RailsCron
       #
       # @param key [String] the lock key to parse
       # @return [Array<String, Time>] tuple of [cron_key, fire_time]
+      def parse_lock_key(key)
+        DispatchLogging.parse_lock_key(key)
+      end
+
       def self.parse_lock_key(key)
         parts = key.split(':')
         fire_time_unix = parts.pop.to_i
