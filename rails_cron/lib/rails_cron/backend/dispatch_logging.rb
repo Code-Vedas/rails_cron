@@ -39,6 +39,7 @@ module RailsCron
           configuration.enable_log_dispatch_registry
         end
         return unless logging_enabled
+        return unless respond_to?(:dispatch_registry)
 
         registry = dispatch_registry
         return unless registry

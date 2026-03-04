@@ -32,11 +32,16 @@ RSpec.describe RailsCron::Backend::DispatchLogging do
     context 'when adapter does not respond to dispatch_registry' do
       it 'returns early without logging' do
         adapter = test_class_without_registry.new
+        logger = instance_double(Logger, error: nil)
+        original_logger = RailsCron.configuration.logger
+        RailsCron.configuration.logger = logger
         RailsCron.configuration.enable_log_dispatch_registry = true
 
         # Should not raise error despite missing dispatch_registry method
         expect { adapter.log_dispatch_attempt('railscron:dispatch:job:1234567890') }.not_to raise_error
+        expect(logger).not_to have_received(:error)
 
+        RailsCron.configuration.logger = original_logger
         RailsCron.configuration.enable_log_dispatch_registry = false
       end
     end

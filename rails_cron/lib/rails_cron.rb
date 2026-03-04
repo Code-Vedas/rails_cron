@@ -157,7 +157,7 @@ module RailsCron
       begin
         registry.add(key: key, cron: cron, enqueue: enqueue)
       rescue StandardError
-        definition_registry.remove_definition(key)
+        rollback_registered_definition(key, existing_definition)
         raise
       end
     end
@@ -173,6 +173,20 @@ module RailsCron
     def unregister(key:)
       definition_registry.remove_definition(key)
       registry.remove(key)
+    end
+
+    def rollback_registered_definition(key, existing_definition)
+      if existing_definition
+        definition_registry.upsert_definition(
+          key: existing_definition[:key],
+          cron: existing_definition[:cron],
+          enabled: existing_definition[:enabled],
+          source: existing_definition[:source],
+          metadata: existing_definition[:metadata]
+        )
+      else
+        definition_registry.remove_definition(key)
+      end
     end
 
     ##

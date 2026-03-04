@@ -7,7 +7,7 @@
 
 require 'rails_helper'
 
-describe RailsCron::Backend::SQLiteAdapter do
+RSpec.describe RailsCron::Backend::SQLiteAdapter do
   let(:adapter) { described_class.new }
 
   before do

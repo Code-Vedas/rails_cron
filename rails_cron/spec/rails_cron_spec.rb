@@ -217,6 +217,40 @@ RSpec.describe RailsCron do
       expect(definition_registry).to have_received(:remove_definition).with('job:rollback')
     end
 
+    it 'restores an existing persisted definition when registry add fails' do
+      definition_registry = instance_double(RailsCron::Definition::Registry)
+      existing_definition = {
+        key: 'job:existing',
+        cron: '0 8 * * *',
+        enabled: false,
+        source: 'api',
+        metadata: { owner: 'ops' }
+      }
+
+      allow(described_class).to receive(:definition_registry).and_return(definition_registry)
+      allow(definition_registry).to receive(:find_definition).with('job:existing').and_return(existing_definition)
+      allow(definition_registry).to receive(:upsert_definition)
+      allow(definition_registry).to receive(:remove_definition)
+      allow(described_class.registry).to receive(:add).and_raise(StandardError, 'registry failure')
+
+      expect do
+        described_class.register(
+          key: 'job:existing',
+          cron: '0 9 * * *',
+          enqueue: ->(fire_time:, idempotency_key:) {}
+        )
+      end.to raise_error(StandardError, 'registry failure')
+
+      expect(definition_registry).to have_received(:upsert_definition).with(
+        key: 'job:existing',
+        cron: '0 8 * * *',
+        enabled: false,
+        source: 'api',
+        metadata: { owner: 'ops' }
+      )
+      expect(definition_registry).not_to have_received(:remove_definition)
+    end
+
     it 'does not remove persisted definition when upsert fails' do
       definition_registry = instance_double(RailsCron::Definition::Registry)
       allow(described_class).to receive(:definition_registry).and_return(definition_registry)

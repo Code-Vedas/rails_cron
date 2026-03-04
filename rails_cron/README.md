@@ -57,7 +57,7 @@ Example initializer (`config/initializers/rails_cron.rb`):
 
 ```ruby
 RailsCron.configure do |c|
-  # Choose your distributed lock adapter
+  # Choose your backend adapter
   # Redis (recommended)
   # c.backend = RailsCron::Backend::RedisAdapter.new(Redis.new(url: ENV["REDIS_URL"]))
 
@@ -66,7 +66,7 @@ RailsCron.configure do |c|
 
   c.tick_interval    = 5      # seconds between scheduler ticks
   c.window_lookback  = 120    # recover missed runs (seconds)
-  c.lease_ttl        = 60     # lock TTL in seconds
+  c.lease_ttl        = 60     # lease TTL in seconds
 end
 ```
 

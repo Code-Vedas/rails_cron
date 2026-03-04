@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require 'active_support/core_ext/object/deep_dup'
 require_relative 'registry'
 
 module RailsCron
@@ -16,7 +17,7 @@ module RailsCron
         @mutex.synchronize do
           now = Time.current
           existing = @definitions[key]
-          @definitions[key] = {
+          definition = {
             key: key,
             cron: cron,
             enabled: enabled,
@@ -26,19 +27,22 @@ module RailsCron
             updated_at: now,
             disabled_at: enabled ? nil : now
           }
+          @definitions[key] = definition
+
+          definition.deep_dup
         end
       end
 
       def remove_definition(key)
-        @mutex.synchronize { @definitions.delete(key) }
+        @mutex.synchronize { @definitions.delete(key)&.deep_dup }
       end
 
       def find_definition(key)
-        @mutex.synchronize { @definitions[key]&.dup }
+        @mutex.synchronize { @definitions[key]&.deep_dup }
       end
 
       def all_definitions
-        @mutex.synchronize { @definitions.values.map(&:dup) }
+        @mutex.synchronize { @definitions.values.map(&:deep_dup) }
       end
 
       def clear

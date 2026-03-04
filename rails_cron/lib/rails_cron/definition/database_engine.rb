@@ -36,6 +36,10 @@ module RailsCron
       def all_definitions
         @definition_model.order(:key).map(&:to_definition_hash)
       end
+
+      def enabled_definitions
+        @definition_model.where(enabled: true).order(:key).map(&:to_definition_hash)
+      end
     end
   end
 end

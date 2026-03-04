@@ -24,6 +24,13 @@ RSpec.describe RailsCron::Definition::DatabaseEngine do
     expect(engine.enabled_definitions.map { |d| d[:key] }).to eq(['job:enabled'])
   end
 
+  it 'returns all definitions' do
+    engine.upsert_definition(key: 'job:one', cron: '0 9 * * *', enabled: true)
+    engine.upsert_definition(key: 'job:two', cron: '0 10 * * *', enabled: false)
+
+    expect(engine.all_definitions.map { |d| d[:key] }).to eq(%w[job:one job:two])
+  end
+
   it 'supports remove_definition' do
     engine.upsert_definition(key: 'job:daily', cron: '0 9 * * *')
 
