@@ -138,6 +138,20 @@ RSpec.describe RailsCron::SchedulerFileLoader do
     expect { build_loader.load }.to raise_error(RailsCron::SchedulerConfigError, /Failed to parse scheduler YAML/)
   end
 
+  it 'raises when YAML aliases are used' do
+    write_scheduler(<<~YAML)
+      defaults: &default_job
+        jobs:
+          - key: "job:aliased"
+            cron: "*/5 * * * *"
+            job_class: "SchedulerLoaderTestJob"
+      test:
+        <<: *default_job
+    YAML
+
+    expect { build_loader.load }.to raise_error(RailsCron::SchedulerConfigError, /Failed to parse scheduler YAML/)
+  end
+
   it 'raises for ERB evaluation errors with file context' do
     write_scheduler(<<~YAML)
       test:
@@ -159,7 +173,7 @@ RSpec.describe RailsCron::SchedulerFileLoader do
             job_class: "SchedulerLoaderTestJob"
     YAML
 
-    expect { build_loader.load }.to raise_error(RailsCron::SchedulerConfigError, /Job key cannot be blank:/)
+    expect { build_loader.load }.to raise_error(RailsCron::SchedulerConfigError, /Job key cannot be blank/)
   end
 
   it 'raises when scheduler_config_path is blank' do
@@ -258,6 +272,18 @@ RSpec.describe RailsCron::SchedulerFileLoader do
     expect { build_loader.load }.to raise_error(RailsCron::SchedulerConfigError, /Invalid cron expression/)
   end
 
+  it 'raises when cron is blank' do
+    write_scheduler(<<~YAML)
+      test:
+        jobs:
+          - key: "job:blank_cron"
+            cron: "   "
+            job_class: "SchedulerLoaderTestJob"
+    YAML
+
+    expect { build_loader.load }.to raise_error(RailsCron::SchedulerConfigError, /Job cron cannot be blank/)
+  end
+
   it 'raises for non-hash metadata' do
     write_scheduler(<<~YAML)
       test:
@@ -339,6 +365,19 @@ RSpec.describe RailsCron::SchedulerFileLoader do
     build_loader.load
 
     expect(definition_registry.find_definition('job:disabled')[:enabled]).to be(false)
+  end
+
+  it 'raises when enabled is not a boolean' do
+    write_scheduler(<<~YAML)
+      test:
+        jobs:
+          - key: "job:bad_enabled"
+            cron: "*/5 * * * *"
+            job_class: "SchedulerLoaderTestJob"
+            enabled: "false"
+    YAML
+
+    expect { build_loader.load }.to raise_error(RailsCron::SchedulerConfigError, /enabled must be a boolean/)
   end
 
   it 'raises when job_class constant is missing' do

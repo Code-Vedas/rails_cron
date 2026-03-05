@@ -69,11 +69,11 @@ module RailsCron
 
     def parse_yaml(path)
       rendered = render_yaml_erb(path)
-      parsed = YAML.safe_load(rendered, aliases: true) || {}
+      parsed = YAML.safe_load(rendered) || {}
       raise SchedulerConfigError, "Expected scheduler YAML root to be a mapping in #{path}" unless parsed.is_a?(Hash)
 
       stringify_keys(parsed)
-    rescue Psych::SyntaxError => e
+    rescue Psych::Exception => e
       raise SchedulerConfigError, "Failed to parse scheduler YAML at #{path}: #{e.message}"
     end
 
@@ -118,7 +118,9 @@ module RailsCron
 
     def normalize_job(job_payload)
       payload = stringify_keys(job_payload)
-      key = extract_required_string(payload, field: 'key', error_prefix: 'Job key cannot be blank')
+      key = payload.fetch('key', '').to_s.strip
+      raise SchedulerConfigError, 'Job key cannot be blank' if key.empty?
+
       cron = extract_required_string(payload, field: 'cron', error_prefix: "Job cron cannot be blank for key '#{key}'")
       job_class_name = extract_required_string(
         payload, field: 'job_class', error_prefix: "Job job_class cannot be blank for key '#{key}'"
@@ -132,10 +134,6 @@ module RailsCron
         job_class_name:,
         **options
       }
-    rescue SchedulerConfigError => e
-      raise e unless e.message == 'Job key cannot be blank'
-
-      raise SchedulerConfigError, "Job key cannot be blank: #{payload.inspect}"
     end
 
     def extract_required_string(payload, field:, error_prefix:)
@@ -156,11 +154,12 @@ module RailsCron
       metadata, args, kwargs, queue, enabled_value = payload.values_at('metadata', 'args', 'kwargs', 'queue', 'enabled')
       args ||= []
       kwargs ||= {}
-      enabled = if payload.key?('enabled')
-                  enabled_value ? true : false
-                else
-                  true
-                end
+      enabled = true
+      if payload.key?('enabled')
+        raise SchedulerConfigError, "enabled must be a boolean for key '#{key}'" unless enabled_value.is_a?(TrueClass) || enabled_value.is_a?(FalseClass)
+
+        enabled = enabled_value
+      end
 
       raise SchedulerConfigError, "metadata must be a mapping for key '#{key}'" if metadata && !metadata.is_a?(Hash)
 
