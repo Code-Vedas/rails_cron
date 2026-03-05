@@ -7,6 +7,7 @@
 
 require 'spec_helper'
 require 'stringio'
+require 'pathname'
 
 RSpec.describe RailsCron::Railtie do
   before do
@@ -52,6 +53,67 @@ RSpec.describe RailsCron::Railtie do
       # Restore original Rails.logger before after hooks run
       # to prevent interference with RSpec-Rails cleanup
       allow(Rails).to receive(:logger).and_call_original
+    end
+  end
+
+  describe '.load_scheduler_file_on_boot!' do
+    before do
+      allow(Rails).to receive(:root).and_return(Pathname.new('/app'))
+      allow(RailsCron).to receive(:load_scheduler_file!)
+    end
+
+    it 'loads scheduler file when file exists and policy is warn' do
+      RailsCron.configuration.scheduler_missing_file_policy = :warn
+      RailsCron.configuration.scheduler_config_path = 'config/scheduler.yml'
+      allow(File).to receive(:exist?).with('/app/config/scheduler.yml').and_return(true)
+
+      described_class.load_scheduler_file_on_boot!
+
+      expect(RailsCron).to have_received(:load_scheduler_file!)
+    end
+
+    it 'does not load scheduler file when file is missing and policy is warn' do
+      RailsCron.configuration.scheduler_missing_file_policy = :warn
+      RailsCron.configuration.scheduler_config_path = 'config/scheduler.yml'
+      allow(File).to receive(:exist?).with('/app/config/scheduler.yml').and_return(false)
+
+      described_class.load_scheduler_file_on_boot!
+
+      expect(RailsCron).not_to have_received(:load_scheduler_file!)
+    end
+
+    it 'loads scheduler file even when missing if policy is error' do
+      RailsCron.configuration.scheduler_missing_file_policy = :error
+      RailsCron.configuration.scheduler_config_path = 'config/scheduler.yml'
+
+      described_class.load_scheduler_file_on_boot!
+
+      expect(RailsCron).to have_received(:load_scheduler_file!)
+    end
+
+    it 'does not load scheduler file when path is blank and policy is warn' do
+      RailsCron.configuration.scheduler_missing_file_policy = :warn
+      RailsCron.configuration.scheduler_config_path = '   '
+
+      described_class.load_scheduler_file_on_boot!
+
+      expect(RailsCron).not_to have_received(:load_scheduler_file!)
+    end
+
+    it 'loads scheduler file for absolute scheduler path when file exists' do
+      RailsCron.configuration.scheduler_missing_file_policy = :warn
+      RailsCron.configuration.scheduler_config_path = '/tmp/scheduler.yml'
+      allow(File).to receive(:exist?).with('/tmp/scheduler.yml').and_return(true)
+
+      described_class.load_scheduler_file_on_boot!
+
+      expect(RailsCron).to have_received(:load_scheduler_file!)
+    end
+
+    it 'does not raise when configuration lookup raises NameError' do
+      allow(RailsCron).to receive(:configuration).and_raise(NameError, 'uninitialized constant MissingConfig')
+
+      expect { described_class.load_scheduler_file_on_boot! }.not_to raise_error
     end
   end
 
@@ -347,6 +409,10 @@ RSpec.describe RailsCron::Railtie do
 
     it 'responds to register_signal_handlers' do
       expect(described_class).to respond_to(:register_signal_handlers)
+    end
+
+    it 'responds to load_scheduler_file_on_boot!' do
+      expect(described_class).to respond_to(:load_scheduler_file_on_boot!)
     end
 
     it 'registers rake task loader for rails_cron tasks' do

@@ -44,7 +44,7 @@ module RailsCron
       normalized_jobs = jobs.map { |job_payload| normalize_job(job_payload) }
       applied_jobs = []
       normalized_jobs.each do |job|
-        applied_job_context = apply_job?(**job)
+        applied_job_context = apply_job(**job)
         next unless applied_job_context
 
         applied_jobs << job
@@ -188,10 +188,10 @@ module RailsCron
       raise SchedulerConfigError, "kwargs keys must be strings or symbols for key '#{key}'"
     end
 
-    def apply_job?(key:, cron:, job_class_name:, queue:, args:, kwargs:, enabled:, metadata:)
+    def apply_job(key:, cron:, job_class_name:, queue:, args:, kwargs:, enabled:, metadata:)
       existing_definition = @definition_registry.find_definition(key)
       existing_registry_entry = @registry.find(key)
-      return false if skip_due_to_conflict?(key:, existing_definition:)
+      return if skip_due_to_conflict?(key:, existing_definition:)
 
       callback = build_callback(
         key: key,
