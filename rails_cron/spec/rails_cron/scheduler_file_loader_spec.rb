@@ -546,6 +546,25 @@ RSpec.describe RailsCron::SchedulerFileLoader do
     expect { build_loader.load }.to raise_error(RailsCron::SchedulerConfigError, /Scheduler key conflict/)
   end
 
+  it 'rolls back earlier applied jobs when a later job fails' do
+    definition_registry.upsert_definition(key: 'job:conflict', cron: '* * * * *', enabled: true, source: 'code', metadata: {})
+    registry.add(key: 'job:conflict', cron: '* * * * *', enqueue: ->(fire_time:, idempotency_key:) { [fire_time, idempotency_key] })
+    write_scheduler(<<~YAML)
+      test:
+        jobs:
+          - key: "job:applied_first"
+            cron: "*/5 * * * *"
+            job_class: "SchedulerLoaderTestJob"
+          - key: "job:conflict"
+            cron: "0 9 * * *"
+            job_class: "SchedulerLoaderTestJob"
+    YAML
+
+    expect { build_loader.load }.to raise_error(RailsCron::SchedulerConfigError, /Scheduler key conflict/)
+    expect(definition_registry.find_definition('job:applied_first')).to be_nil
+    expect(registry.registered?('job:applied_first')).to be(false)
+  end
+
   it 'applies conflict policy file_wins by replacing definition and callback' do
     configuration.scheduler_conflict_policy = :file_wins
     old_callback = ->(fire_time:, idempotency_key:) { [fire_time, idempotency_key] }
@@ -649,7 +668,7 @@ RSpec.describe RailsCron::SchedulerFileLoader do
     expect(definition_registry.find_definition('job:new_rollback')).to be_nil
   end
 
-  it 'does not remove definition during rollback when key is already registered' do
+  it 'removes definition and callback for newly applied jobs during rollback' do
     definition_registry.upsert_definition(
       key: 'job:registered_during_rollback',
       cron: '*/5 * * * *',
@@ -670,7 +689,8 @@ RSpec.describe RailsCron::SchedulerFileLoader do
       existing_registry_entry: nil
     )
 
-    expect(definition_registry.find_definition('job:registered_during_rollback')).not_to be_nil
+    expect(definition_registry.find_definition('job:registered_during_rollback')).to be_nil
+    expect(registry.registered?('job:registered_during_rollback')).to be(false)
   end
 
   it 'restores previous registry entry when rolling back and key is now unregistered' do
@@ -691,18 +711,19 @@ RSpec.describe RailsCron::SchedulerFileLoader do
     expect(registry.find('job:restore_registry')&.enqueue).to eq(old_callback)
   end
 
-  it 'skips registry restore when key is already registered during rollback' do
+  it 'replaces current callback with existing registry entry during rollback' do
+    replacement_callback = ->(fire_time:, idempotency_key:) { [fire_time, idempotency_key, :replacement] }
+    original_callback = ->(fire_time:, idempotency_key:) { [fire_time, idempotency_key, :original] }
     registry.add(
       key: 'job:already_registered',
       cron: '* * * * *',
-      enqueue: ->(fire_time:, idempotency_key:) { [fire_time, idempotency_key] }
+      enqueue: replacement_callback
     )
     existing_registry_entry = RailsCron::Registry::Entry.new(
       key: 'job:already_registered',
       cron: '0 8 * * *',
-      enqueue: ->(fire_time:, idempotency_key:) { [fire_time, idempotency_key] }
+      enqueue: original_callback
     ).freeze
-    allow(registry).to receive(:add).and_call_original
 
     build_loader.send(
       :rollback_applied_job,
@@ -711,11 +732,34 @@ RSpec.describe RailsCron::SchedulerFileLoader do
       existing_registry_entry: existing_registry_entry
     )
 
-    expect(registry).not_to have_received(:add).with(
-      key: 'job:already_registered',
-      cron: '0 8 * * *',
-      enqueue: existing_registry_entry.enqueue
+    restored_entry = registry.find('job:already_registered')
+    expect(restored_entry&.cron).to eq('0 8 * * *')
+    expect(restored_entry&.enqueue).to eq(original_callback)
+  end
+
+  it 'does not restore existing registry entry when that key is already registered' do
+    existing_callback = ->(fire_time:, idempotency_key:) { [fire_time, idempotency_key, :existing] }
+    registry.add(
+      key: 'job:existing_registered',
+      cron: '*/15 * * * *',
+      enqueue: existing_callback
     )
+    existing_registry_entry = RailsCron::Registry::Entry.new(
+      key: 'job:existing_registered',
+      cron: '0 8 * * *',
+      enqueue: ->(fire_time:, idempotency_key:) { [fire_time, idempotency_key, :old] }
+    ).freeze
+
+    build_loader.send(
+      :rollback_applied_job,
+      key: 'job:new_key',
+      existing_definition: nil,
+      existing_registry_entry: existing_registry_entry
+    )
+
+    restored_entry = registry.find('job:existing_registered')
+    expect(restored_entry&.cron).to eq('*/15 * * * *')
+    expect(restored_entry&.enqueue).to eq(existing_callback)
   end
 
   it 'logs rollback errors when logger is present' do

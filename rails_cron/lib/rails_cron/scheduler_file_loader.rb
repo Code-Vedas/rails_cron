@@ -34,6 +34,7 @@ module RailsCron
     end
 
     def load
+      applied_job_contexts = []
       path = scheduler_file_path
       return handle_missing_file(path) unless File.exist?(path)
 
@@ -43,10 +44,17 @@ module RailsCron
       normalized_jobs = jobs.map { |job_payload| normalize_job(job_payload) }
       applied_jobs = []
       normalized_jobs.each do |job|
-        applied_jobs << job if apply_job?(**job)
+        applied_job_context = apply_job?(**job)
+        next unless applied_job_context
+
+        applied_jobs << job
+        applied_job_contexts << applied_job_context
       end
 
       applied_jobs
+    rescue StandardError
+      rollback_applied_jobs(applied_job_contexts)
+      raise
     end
 
     private
@@ -218,16 +226,24 @@ module RailsCron
         raise
       end
 
-      true
+      { key: key, existing_definition: existing_definition, existing_registry_entry: existing_registry_entry }
+    end
+
+    def rollback_applied_jobs(applied_job_contexts = [])
+      applied_job_contexts.reverse_each do |applied_job_context|
+        rollback_applied_job(**applied_job_context)
+      end
     end
 
     def rollback_applied_job(key:, existing_definition:, existing_registry_entry:)
       if existing_definition
         definition_attributes = existing_definition.slice(:key, :cron, :enabled, :source, :metadata)
         @definition_registry.upsert_definition(**definition_attributes)
-      elsif !@registry.registered?(key)
+      else
         @definition_registry.remove_definition(key)
       end
+
+      @registry.remove(key) if @registry.registered?(key)
 
       return unless existing_registry_entry
 

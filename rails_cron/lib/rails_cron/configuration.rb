@@ -157,7 +157,7 @@ module RailsCron
     def add_namespace_error(errors)
       return unless @values[:namespace].to_s.strip.empty?
 
-      errors << 'namespace cannot be empty'
+      errors << 'namespace cannot be blank'
     end
 
     def add_lease_ttl_window_error(errors)
@@ -177,7 +177,7 @@ module RailsCron
     def add_scheduler_config_path_error(errors)
       return unless @values[:scheduler_config_path].to_s.strip.empty?
 
-      errors << 'scheduler_config_path cannot be empty'
+      errors << 'scheduler_config_path cannot be blank'
     end
 
     def add_scheduler_conflict_policy_error(errors)
