@@ -37,8 +37,10 @@ module RailsCron
       payload = parse_yaml(path)
       jobs = extract_jobs(payload)
       validate_unique_keys(jobs)
+      normalized_jobs = jobs.map { |job_payload| normalize_job(job_payload) }
+      normalized_jobs.each { |job| apply_job(**job) }
 
-      jobs.each { |job_payload| apply_job(**normalize_job(job_payload)) }
+      normalized_jobs
     end
 
     private
@@ -91,7 +93,11 @@ module RailsCron
     end
 
     def validate_unique_keys(jobs)
-      keys = jobs.map { |job_payload| stringify_keys(job_payload)['key'].to_s.strip }
+      keys = jobs.map do |job_payload|
+        raise SchedulerConfigError, "Each jobs entry must be a mapping, got #{job_payload.class}" unless job_payload.is_a?(Hash)
+
+        stringify_keys(job_payload)['key'].to_s.strip
+      end
       duplicates = keys.group_by(&:itself).select { |key, arr| !key.empty? && arr.size > 1 }.keys
       return if duplicates.empty?
 
@@ -134,22 +140,32 @@ module RailsCron
     end
 
     def extract_job_options(payload, key:)
-      metadata = payload['metadata']
+      metadata, args, kwargs, queue, enabled_value = payload.values_at('metadata', 'args', 'kwargs', 'queue', 'enabled')
+      args ||= []
+      kwargs ||= {}
+      enabled = if payload.key?('enabled')
+                  enabled_value ? true : false
+                else
+                  true
+                end
+
       raise SchedulerConfigError, "metadata must be a mapping for key '#{key}'" if metadata && !metadata.is_a?(Hash)
 
-      args = payload.fetch('args', [])
-      kwargs = payload.fetch('kwargs', {})
-      queue = payload['queue']
-      enabled = payload.fetch('enabled', true) ? true : false
-
-      raise SchedulerConfigError, "args must be an array for key '#{key}'" unless args.is_a?(Array)
-      raise SchedulerConfigError, "kwargs must be a mapping for key '#{key}'" unless kwargs.is_a?(Hash)
-      raise SchedulerConfigError, "queue must be a string for key '#{key}'" if queue && !queue.is_a?(String)
+      validate_job_option_types(key:, args:, kwargs:, queue:)
 
       validate_placeholders(args, key:)
       validate_placeholders(kwargs, key:)
 
       { queue: queue, args: args.deep_dup, kwargs: kwargs.deep_dup, enabled: enabled, metadata: metadata ? metadata.deep_dup : {} }
+    end
+
+    def validate_job_option_types(key:, args:, kwargs:, queue:)
+      raise SchedulerConfigError, "args must be an array for key '#{key}'" unless args.is_a?(Array)
+      raise SchedulerConfigError, "kwargs must be a mapping for key '#{key}'" unless kwargs.is_a?(Hash)
+      raise SchedulerConfigError, "queue must be a string for key '#{key}'" if queue && !queue.is_a?(String)
+      return if kwargs.keys.all? { |kwargs_key| kwargs_key.is_a?(String) || kwargs_key.is_a?(Symbol) }
+
+      raise SchedulerConfigError, "kwargs keys must be strings or symbols for key '#{key}'"
     end
 
     def apply_job(key:, cron:, job_class_name:, queue:, args:, kwargs:, enabled:, metadata:)

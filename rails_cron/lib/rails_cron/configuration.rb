@@ -218,7 +218,7 @@ module RailsCron
       when :enable_log_dispatch_registry
         value ? true : false
       when :scheduler_conflict_policy, :scheduler_missing_file_policy
-        value.to_sym
+        value&.to_sym
       else
         value
       end

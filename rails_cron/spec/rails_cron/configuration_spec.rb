@@ -306,6 +306,16 @@ RSpec.describe RailsCron::Configuration do
   end
 
   describe 'scheduler validation' do
+    it 'allows nil scheduler_conflict_policy assignment and reports it via validation' do
+      expect { config.scheduler_conflict_policy = nil }.not_to raise_error
+      expect { config.validate! }.to raise_error(RailsCron::ConfigurationError, /scheduler_conflict_policy/)
+    end
+
+    it 'allows nil scheduler_missing_file_policy assignment and reports it via validation' do
+      expect { config.scheduler_missing_file_policy = nil }.not_to raise_error
+      expect { config.validate! }.to raise_error(RailsCron::ConfigurationError, /scheduler_missing_file_policy/)
+    end
+
     it 'raises when scheduler_config_path is blank' do
       config.scheduler_config_path = ' '
       expect { config.validate! }.to raise_error(RailsCron::ConfigurationError, /scheduler_config_path/)

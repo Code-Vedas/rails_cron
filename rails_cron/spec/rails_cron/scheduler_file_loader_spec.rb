@@ -61,7 +61,9 @@ RSpec.describe RailsCron::SchedulerFileLoader do
             job_class: "SchedulerLoaderTestJob"
     YAML
 
-    build_loader.load
+    result = build_loader.load
+
+    expect(result).to all(include(:key, :cron, :job_class_name))
 
     expect(definition_registry.find_definition('job:one')).to include(source: 'file', cron: '*/5 * * * *')
     expect(definition_registry.find_definition('job:two')).to include(source: 'file', cron: '0 9 * * *')
@@ -185,6 +187,16 @@ RSpec.describe RailsCron::SchedulerFileLoader do
     expect { build_loader.load }.to raise_error(RailsCron::SchedulerConfigError, /defaults.jobs/)
   end
 
+  it 'raises when a jobs entry is not a mapping' do
+    write_scheduler(<<~YAML)
+      test:
+        jobs:
+          - "not-a-job-hash"
+    YAML
+
+    expect { build_loader.load }.to raise_error(RailsCron::SchedulerConfigError, /jobs entry must be a mapping/)
+  end
+
   it 'raises when env jobs is not an array' do
     write_scheduler(<<~YAML)
       defaults:
@@ -251,6 +263,14 @@ RSpec.describe RailsCron::SchedulerFileLoader do
     YAML
 
     expect { build_loader.load }.to raise_error(RailsCron::SchedulerConfigError, /kwargs must be a mapping/)
+  end
+
+  it 'raises for kwargs keys that cannot be symbolized' do
+    invalid_kwargs = { Object.new => 'value' }
+
+    expect do
+      build_loader.send(:extract_job_options, { 'kwargs' => invalid_kwargs }, key: 'job:bad_kwargs_keys')
+    end.to raise_error(RailsCron::SchedulerConfigError, /kwargs keys must be strings or symbols/)
   end
 
   it 'raises for non-string queue' do
