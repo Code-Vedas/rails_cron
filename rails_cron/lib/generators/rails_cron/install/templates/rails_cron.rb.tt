@@ -21,4 +21,11 @@ RailsCron.configure do |config|
   config.recovery_window = 3600
   config.enable_dispatch_recovery = true
   config.enable_log_dispatch_registry = false
+
+  # Scheduler file loading
+  config.scheduler_config_path = 'config/scheduler.yml'
+  # :error, :code_wins, :file_wins
+  config.scheduler_conflict_policy = :error
+  # :warn, :error
+  config.scheduler_missing_file_policy = :warn
 end

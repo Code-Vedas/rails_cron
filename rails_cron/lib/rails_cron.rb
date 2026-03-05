@@ -25,6 +25,8 @@ require 'rails_cron/backend/sqlite_adapter'
 require 'rails_cron/idempotency_key_generator'
 require 'rails_cron/cron_utils'
 require 'rails_cron/cron_humanizer'
+require 'rails_cron/scheduler_config_error'
+require 'rails_cron/scheduler_file_loader'
 require 'rails_cron/rake_tasks'
 require 'rails_cron/coordinator'
 require 'rails_cron/railtie'
@@ -165,6 +167,21 @@ module RailsCron
 
         raise
       end
+    end
+
+    ##
+    # Load scheduler definitions from the configured scheduler YAML file.
+    #
+    # @return [Array<Hash>] normalized jobs loaded from scheduler file
+    # @raise [SchedulerConfigError] if scheduler file is invalid
+    def load_scheduler_file!
+      loader = SchedulerFileLoader.new(
+        configuration: configuration,
+        definition_registry: definition_registry,
+        registry: registry,
+        logger: configuration.logger
+      )
+      loader.load
     end
 
     ##

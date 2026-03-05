@@ -103,6 +103,9 @@ module RailsCron
       # Re-ensure logger is set in case it wasn't available during first initializer
       RailsCron::Railtie.ensure_logger!
 
+      # Load scheduler definitions from file (configurable path)
+      RailsCron.load_scheduler_file!
+
       # Register signal handlers for graceful shutdown
       RailsCron::Railtie.register_signal_handlers
     end

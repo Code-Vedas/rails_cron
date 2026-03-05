@@ -1,0 +1,22 @@
+defaults:
+  jobs:
+    - key: "reports:weekly_summary"
+      cron: "0 9 * * 1"
+      job_class: "WeeklySummaryJob"
+      enabled: true
+      queue: "default"
+      args:
+        - "{{fire_time.iso8601}}"
+      kwargs:
+        idempotency_key: "{{idempotency_key}}"
+      metadata:
+        owner: "ops"
+
+development:
+  jobs: []
+
+test:
+  jobs: []
+
+production:
+  jobs: []

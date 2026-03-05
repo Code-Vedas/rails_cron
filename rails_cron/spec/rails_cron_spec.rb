@@ -102,6 +102,19 @@ RSpec.describe RailsCron do
     end
   end
 
+  describe '.load_scheduler_file!' do
+    it 'delegates to SchedulerFileLoader and returns loaded jobs' do
+      loader = instance_double(RailsCron::SchedulerFileLoader)
+      allow(RailsCron::SchedulerFileLoader).to receive(:new).and_return(loader)
+      allow(loader).to receive(:load).and_return([{ key: 'job:one' }])
+
+      result = described_class.load_scheduler_file!
+
+      expect(result).to eq([{ key: 'job:one' }])
+      expect(loader).to have_received(:load)
+    end
+  end
+
   describe 'configuration readers' do
     {
       tick_interval: 12,
