@@ -3,6 +3,7 @@
 require 'rails_helper'
 require 'tmpdir'
 require 'fileutils'
+require 'pathname'
 
 RSpec.describe RailsCron::SchedulerFileLoader do
   let(:configuration) { RailsCron::Configuration.new }
@@ -571,6 +572,32 @@ RSpec.describe RailsCron::SchedulerFileLoader do
     expect(SchedulerLoaderTestJob).to have_received(:perform_later)
   end
 
+  it 'rolls back definition and callback when registry add fails during apply' do
+    configuration.scheduler_conflict_policy = :file_wins
+    original_callback = ->(fire_time:, idempotency_key:) { [fire_time, idempotency_key] }
+    definition_registry.upsert_definition(key: 'job:rollback', cron: '* * * * *', enabled: true, source: 'code', metadata: {})
+    registry.add(key: 'job:rollback', cron: '* * * * *', enqueue: original_callback)
+    write_scheduler(<<~YAML)
+      test:
+        jobs:
+          - key: "job:rollback"
+            cron: "0 9 * * *"
+            job_class: "SchedulerLoaderTestJob"
+    YAML
+    allow(registry).to receive(:add).and_call_original
+    allow(registry).to receive(:add).with(
+      key: 'job:rollback',
+      cron: '0 9 * * *',
+      enqueue: instance_of(Proc)
+    ).and_raise(StandardError, 'registry add failure')
+
+    expect { build_loader.load }.to raise_error(StandardError, 'registry add failure')
+
+    restored_definition = definition_registry.find_definition('job:rollback')
+    expect(restored_definition).to include(cron: '* * * * *', source: 'code')
+    expect(registry.find('job:rollback')&.enqueue).to eq(original_callback)
+  end
+
   it 'warns and continues when scheduler file is missing and policy is warn' do
     configuration.scheduler_config_path = File.join(tmpdir, 'missing.yml')
     allow(logger).to receive(:warn)
@@ -601,5 +628,129 @@ RSpec.describe RailsCron::SchedulerFileLoader do
     YAML
 
     expect { build_loader.load }.to raise_error(RailsCron::SchedulerConfigError, /Unsupported scheduler_conflict_policy/)
+  end
+
+  it 'removes definition when rolling back a newly inserted job with no registry entry' do
+    definition_registry.upsert_definition(
+      key: 'job:new_rollback',
+      cron: '*/5 * * * *',
+      enabled: true,
+      source: 'file',
+      metadata: {}
+    )
+
+    build_loader.send(
+      :rollback_applied_job,
+      key: 'job:new_rollback',
+      existing_definition: nil,
+      existing_registry_entry: nil
+    )
+
+    expect(definition_registry.find_definition('job:new_rollback')).to be_nil
+  end
+
+  it 'does not remove definition during rollback when key is already registered' do
+    definition_registry.upsert_definition(
+      key: 'job:registered_during_rollback',
+      cron: '*/5 * * * *',
+      enabled: true,
+      source: 'file',
+      metadata: {}
+    )
+    registry.add(
+      key: 'job:registered_during_rollback',
+      cron: '*/5 * * * *',
+      enqueue: ->(fire_time:, idempotency_key:) { [fire_time, idempotency_key] }
+    )
+
+    build_loader.send(
+      :rollback_applied_job,
+      key: 'job:registered_during_rollback',
+      existing_definition: nil,
+      existing_registry_entry: nil
+    )
+
+    expect(definition_registry.find_definition('job:registered_during_rollback')).not_to be_nil
+  end
+
+  it 'restores previous registry entry when rolling back and key is now unregistered' do
+    old_callback = ->(fire_time:, idempotency_key:) { [fire_time, idempotency_key] }
+    existing_registry_entry = RailsCron::Registry::Entry.new(
+      key: 'job:restore_registry',
+      cron: '0 8 * * *',
+      enqueue: old_callback
+    ).freeze
+
+    build_loader.send(
+      :rollback_applied_job,
+      key: 'job:restore_registry',
+      existing_definition: nil,
+      existing_registry_entry: existing_registry_entry
+    )
+
+    expect(registry.find('job:restore_registry')&.enqueue).to eq(old_callback)
+  end
+
+  it 'skips registry restore when key is already registered during rollback' do
+    registry.add(
+      key: 'job:already_registered',
+      cron: '* * * * *',
+      enqueue: ->(fire_time:, idempotency_key:) { [fire_time, idempotency_key] }
+    )
+    existing_registry_entry = RailsCron::Registry::Entry.new(
+      key: 'job:already_registered',
+      cron: '0 8 * * *',
+      enqueue: ->(fire_time:, idempotency_key:) { [fire_time, idempotency_key] }
+    ).freeze
+    allow(registry).to receive(:add).and_call_original
+
+    build_loader.send(
+      :rollback_applied_job,
+      key: 'job:already_registered',
+      existing_definition: nil,
+      existing_registry_entry: existing_registry_entry
+    )
+
+    expect(registry).not_to have_received(:add).with(
+      key: 'job:already_registered',
+      cron: '0 8 * * *',
+      enqueue: existing_registry_entry.enqueue
+    )
+  end
+
+  it 'logs rollback errors when logger is present' do
+    allow(logger).to receive(:error)
+    existing_definition = { key: 'job:error', cron: '* * * * *', enabled: true, source: 'file', metadata: {} }
+    allow(definition_registry).to receive(:upsert_definition).and_raise(StandardError, 'rollback blew up')
+
+    build_loader.send(
+      :rollback_applied_job,
+      key: 'job:error',
+      existing_definition: existing_definition,
+      existing_registry_entry: nil
+    )
+
+    expect(logger).to have_received(:error).with(/Failed to rollback scheduler file application for job:error/)
+  end
+
+  it 'does not raise rollback errors when logger is nil' do
+    nil_logger_loader = described_class.new(
+      configuration: configuration,
+      definition_registry: definition_registry,
+      registry: registry,
+      logger: nil,
+      rails_context: instance_double(SchedulerLoaderRailsContext, env: 'test', root: Pathname.new(tmpdir))
+    )
+    existing_definition = { key: 'job:error_nil_logger', cron: '* * * * *', enabled: true, source: 'file', metadata: {} }
+    allow(definition_registry).to receive(:upsert_definition).and_raise(StandardError, 'rollback blew up')
+
+    expect do
+      nil_logger_loader.send(
+        :rollback_applied_job,
+        key: 'job:error_nil_logger',
+        existing_definition: existing_definition,
+        existing_registry_entry: nil
+      )
+    end.not_to raise_error
   end
 end

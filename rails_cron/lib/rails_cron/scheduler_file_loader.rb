@@ -182,6 +182,7 @@ module RailsCron
 
     def apply_job?(key:, cron:, job_class_name:, queue:, args:, kwargs:, enabled:, metadata:)
       existing_definition = @definition_registry.find_definition(key)
+      existing_registry_entry = @registry.find(key)
       return false if skip_due_to_conflict?(key:, existing_definition:)
 
       callback = build_callback(
@@ -209,9 +210,37 @@ module RailsCron
         metadata: persisted_metadata
       )
 
-      @registry.remove(key) if @registry.registered?(key)
-      @registry.add(key: key, cron: cron, enqueue: callback)
+      begin
+        @registry.remove(key) if @registry.registered?(key)
+        @registry.add(key: key, cron: cron, enqueue: callback)
+      rescue StandardError
+        rollback_applied_job(key:, existing_definition:, existing_registry_entry:)
+        raise
+      end
+
       true
+    end
+
+    def rollback_applied_job(key:, existing_definition:, existing_registry_entry:)
+      if existing_definition
+        definition_attributes = existing_definition.slice(:key, :cron, :enabled, :source, :metadata)
+        @definition_registry.upsert_definition(**definition_attributes)
+      elsif !@registry.registered?(key)
+        @definition_registry.remove_definition(key)
+      end
+
+      return unless existing_registry_entry
+
+      existing_key = existing_registry_entry.key
+      return if @registry.registered?(existing_key)
+
+      @registry.add(
+        key: existing_key,
+        cron: existing_registry_entry.cron,
+        enqueue: existing_registry_entry.enqueue
+      )
+    rescue StandardError => e
+      @logger&.error("Failed to rollback scheduler file application for #{key}: #{e.message}")
     end
 
     def skip_due_to_conflict?(key:, existing_definition:)
