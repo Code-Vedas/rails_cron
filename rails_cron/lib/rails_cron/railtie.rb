@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require 'pathname'
+
 # Copyright Codevedas Inc. 2025-present
 #
 # This source code is licensed under the MIT license found in the
@@ -69,6 +71,45 @@ module RailsCron
     end
 
     ##
+    # Load scheduler file at boot while respecting missing-file policy.
+    def self.load_scheduler_file_on_boot!
+      configuration = fetch_configuration_for_boot
+      return unless configuration
+
+      if configuration.scheduler_missing_file_policy == :error
+        load_scheduler_file_now!
+        return
+      end
+
+      scheduler_path = configuration.scheduler_config_path.to_s.strip
+      return if scheduler_path.empty?
+
+      absolute_path = resolve_scheduler_path(scheduler_path)
+      unless File.exist?(absolute_path)
+        RailsCron.logger&.warn("Scheduler file not found at #{absolute_path}")
+        return
+      end
+
+      load_scheduler_file_now!
+    end
+
+    def self.resolve_scheduler_path(path)
+      candidate = Pathname.new(path)
+      candidate.absolute? ? candidate.to_s : Rails.root.join(candidate).to_s
+    end
+
+    def self.load_scheduler_file_now!
+      RailsCron.load_scheduler_file!
+    end
+
+    def self.fetch_configuration_for_boot
+      RailsCron.configuration
+    rescue NameError => e
+      RailsCron.logger&.debug("Skipping scheduler file boot load due to configuration error: #{e.message}")
+      nil
+    end
+
+    ##
     # Autoload paths for RailsCron models and other components
     initializer 'rails_cron.autoload' do |_app|
       models_path = File.expand_path('../../app/models', __dir__)
@@ -102,6 +143,9 @@ module RailsCron
     config.after_initialize do
       # Re-ensure logger is set in case it wasn't available during first initializer
       RailsCron::Railtie.ensure_logger!
+
+      # Load scheduler definitions from file when available (or required by policy)
+      RailsCron::Railtie.load_scheduler_file_on_boot!
 
       # Register signal handlers for graceful shutdown
       RailsCron::Railtie.register_signal_handlers

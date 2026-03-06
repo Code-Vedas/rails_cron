@@ -26,7 +26,10 @@ RSpec.describe RailsCron::Configuration do
       enable_log_dispatch_registry: false,
       enable_dispatch_recovery: true,
       recovery_window: 86_400,
-      recovery_startup_jitter: 5
+      recovery_startup_jitter: 5,
+      scheduler_config_path: 'config/scheduler.yml',
+      scheduler_conflict_policy: :error,
+      scheduler_missing_file_policy: :warn
     }
   end
 
@@ -108,6 +111,21 @@ RSpec.describe RailsCron::Configuration do
     it 'allows nil time_zone' do
       config.time_zone = nil
       expect(config.time_zone).to be_nil
+    end
+
+    it 'sets scheduler_config_path' do
+      config.scheduler_config_path = 'config/custom_scheduler.yml'
+      expect(config.scheduler_config_path).to eq('config/custom_scheduler.yml')
+    end
+
+    it 'sets scheduler_conflict_policy' do
+      config.scheduler_conflict_policy = 'code_wins'
+      expect(config.scheduler_conflict_policy).to eq(:code_wins)
+    end
+
+    it 'sets scheduler_missing_file_policy' do
+      config.scheduler_missing_file_policy = 'error'
+      expect(config.scheduler_missing_file_policy).to eq(:error)
     end
   end
 
@@ -272,6 +290,45 @@ RSpec.describe RailsCron::Configuration do
 
     it 'includes enable_log_dispatch_registry' do
       expect(config.to_h[:enable_log_dispatch_registry]).to be false
+    end
+
+    it 'includes scheduler_config_path' do
+      expect(config.to_h[:scheduler_config_path]).to eq('config/scheduler.yml')
+    end
+
+    it 'includes scheduler_conflict_policy' do
+      expect(config.to_h[:scheduler_conflict_policy]).to eq(:error)
+    end
+
+    it 'includes scheduler_missing_file_policy' do
+      expect(config.to_h[:scheduler_missing_file_policy]).to eq(:warn)
+    end
+  end
+
+  describe 'scheduler validation' do
+    it 'allows nil scheduler_conflict_policy assignment and reports it via validation' do
+      expect { config.scheduler_conflict_policy = nil }.not_to raise_error
+      expect { config.validate! }.to raise_error(RailsCron::ConfigurationError, /scheduler_conflict_policy/)
+    end
+
+    it 'allows nil scheduler_missing_file_policy assignment and reports it via validation' do
+      expect { config.scheduler_missing_file_policy = nil }.not_to raise_error
+      expect { config.validate! }.to raise_error(RailsCron::ConfigurationError, /scheduler_missing_file_policy/)
+    end
+
+    it 'raises when scheduler_config_path is blank' do
+      config.scheduler_config_path = ' '
+      expect { config.validate! }.to raise_error(RailsCron::ConfigurationError, /scheduler_config_path/)
+    end
+
+    it 'raises when scheduler_conflict_policy is invalid' do
+      config.scheduler_conflict_policy = :invalid
+      expect { config.validate! }.to raise_error(RailsCron::ConfigurationError, /scheduler_conflict_policy/)
+    end
+
+    it 'raises when scheduler_missing_file_policy is invalid' do
+      config.scheduler_missing_file_policy = :invalid
+      expect { config.validate! }.to raise_error(RailsCron::ConfigurationError, /scheduler_missing_file_policy/)
     end
   end
 

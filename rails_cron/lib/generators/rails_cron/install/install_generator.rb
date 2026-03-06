@@ -20,6 +20,10 @@ module RailsCron
         template 'rails_cron.rb.tt', 'config/initializers/rails_cron.rb'
       end
 
+      def create_scheduler_config
+        template 'scheduler.yml.tt', 'config/scheduler.yml'
+      end
+
       def install_migrations
         templates = migration_templates
         return say_status(:skip, "No database migrations required for #{normalized_backend} backend", :yellow) if templates.empty?

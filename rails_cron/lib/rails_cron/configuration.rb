@@ -29,7 +29,10 @@ module RailsCron
       enable_log_dispatch_registry: false,
       enable_dispatch_recovery: true,
       recovery_window: 86_400, # 24 hours in seconds
-      recovery_startup_jitter: 5 # max random delay in seconds
+      recovery_startup_jitter: 5, # max random delay in seconds
+      scheduler_config_path: 'config/scheduler.yml',
+      scheduler_conflict_policy: :error,
+      scheduler_missing_file_policy: :warn
     }.freeze
 
     ##
@@ -100,7 +103,10 @@ module RailsCron
         enable_log_dispatch_registry: @values[:enable_log_dispatch_registry],
         enable_dispatch_recovery: @values[:enable_dispatch_recovery],
         recovery_window: @values[:recovery_window],
-        recovery_startup_jitter: @values[:recovery_startup_jitter]
+        recovery_startup_jitter: @values[:recovery_startup_jitter],
+        scheduler_config_path: @values[:scheduler_config_path],
+        scheduler_conflict_policy: @values[:scheduler_conflict_policy],
+        scheduler_missing_file_policy: @values[:scheduler_missing_file_policy]
       }
     end
 
@@ -114,6 +120,9 @@ module RailsCron
       add_lease_ttl_error(errors)
       add_namespace_error(errors)
       add_lease_ttl_window_error(errors)
+      add_scheduler_config_path_error(errors)
+      add_scheduler_conflict_policy_error(errors)
+      add_scheduler_missing_file_policy_error(errors)
       errors
     end
 
@@ -148,7 +157,7 @@ module RailsCron
     def add_namespace_error(errors)
       return unless @values[:namespace].to_s.strip.empty?
 
-      errors << 'namespace cannot be empty'
+      errors << 'namespace cannot be blank'
     end
 
     def add_lease_ttl_window_error(errors)
@@ -163,6 +172,24 @@ module RailsCron
       return unless lease_ttl < minimum_ttl
 
       errors << "lease_ttl (#{lease_ttl}s) must be >= window_lookback + tick_interval (#{minimum_ttl}s) to prevent duplicate dispatch"
+    end
+
+    def add_scheduler_config_path_error(errors)
+      return unless @values[:scheduler_config_path].to_s.strip.empty?
+
+      errors << 'scheduler_config_path cannot be blank'
+    end
+
+    def add_scheduler_conflict_policy_error(errors)
+      return if %i[error code_wins file_wins].include?(@values[:scheduler_conflict_policy])
+
+      errors << 'scheduler_conflict_policy must be :error, :code_wins, or :file_wins'
+    end
+
+    def add_scheduler_missing_file_policy_error(errors)
+      return if %i[warn error].include?(@values[:scheduler_missing_file_policy])
+
+      errors << 'scheduler_missing_file_policy must be :warn or :error'
     end
 
     def handle_known_key(method_name)
@@ -184,12 +211,14 @@ module RailsCron
       case key
       when :tick_interval, :window_lookback, :window_lookahead, :lease_ttl
         value.to_i
-      when :namespace
+      when :namespace, :scheduler_config_path
         value.to_s
       when :time_zone
         value&.to_s
       when :enable_log_dispatch_registry
         value ? true : false
+      when :scheduler_conflict_policy, :scheduler_missing_file_policy
+        value&.to_sym
       else
         value
       end

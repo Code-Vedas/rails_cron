@@ -79,8 +79,40 @@ RailsCron.configure do |c|
   c.recovery_window = 3600
   c.enable_dispatch_recovery = true
   c.enable_log_dispatch_registry = false
+
+  # Scheduler file loading
+  c.scheduler_config_path = "config/scheduler.yml"
+  c.scheduler_conflict_policy = :error # :error, :code_wins, :file_wins
+  c.scheduler_missing_file_policy = :warn # :warn, :error
 end
 ```
+
+Example scheduler file (`config/scheduler.yml`):
+
+```yaml
+defaults:
+  jobs:
+    - key: "reports:weekly_summary"
+      cron: "0 9 * * 1"
+      job_class: "WeeklySummaryJob"
+      enabled: true
+      queue: "default"
+      args:
+        - "{{fire_time.iso8601}}"
+      kwargs:
+        idempotency_key: "{{idempotency_key}}"
+      metadata:
+        owner: "ops"
+
+production:
+  jobs:
+    - key: "reports:daily_digest"
+      cron: "<%= ENV.fetch('DAILY_DIGEST_CRON', '0 7 * * *') %>"
+      job_class: "DailyDigestJob"
+```
+
+`scheduler.yml` supports ERB and environment sections (`defaults`, `development`, `test`, `production`, etc.).
+Allowed runtime placeholders in `args` and `kwargs` values (not keys): `{{fire_time.iso8601}}`, `{{fire_time.unix}}`, `{{idempotency_key}}`, `{{key}}`.
 
 👉 [See full installation guide →](https://rails-cron.codevedas.com/install)
 

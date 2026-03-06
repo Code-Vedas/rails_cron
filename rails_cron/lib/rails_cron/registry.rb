@@ -63,6 +63,26 @@ module RailsCron
     end
 
     ##
+    # Insert or replace a cron job entry atomically.
+    #
+    # Unlike {#add}, this does not raise when the key already exists.
+    #
+    # @param key [String] unique identifier for the cron task
+    # @param cron [String] cron expression (e.g., "0 9 * * *", "@daily")
+    # @param enqueue [Proc, Lambda] callable that executes when cron fires
+    # @return [Entry] the stored entry (frozen)
+    #
+    # @raise [ArgumentError] if key is empty, cron is empty, or enqueue is not callable
+    def upsert(key:, cron:, enqueue:)
+      validate_entry(key, cron, enqueue)
+
+      @mutex.synchronize do
+        entry = Entry.new(key: key, cron: cron, enqueue: enqueue).freeze
+        @entries[key] = entry
+      end
+    end
+
+    ##
     # Unregister (remove) a cron job by key.
     #
     # @param key [String] the key to unregister

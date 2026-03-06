@@ -135,6 +135,39 @@ RSpec.describe RailsCron::Registry do
     end
   end
 
+  describe '#upsert' do
+    it 'adds a new entry when key is not present' do
+      entry = registry.upsert(key: test_key, cron: test_cron, enqueue: test_enqueue)
+
+      expect(entry).to have_attributes(key: test_key, cron: test_cron, enqueue: test_enqueue)
+      expect(registry.size).to eq(1)
+    end
+
+    it 'replaces an existing entry for the same key' do
+      old_enqueue = ->(fire_time:, idempotency_key:) { [fire_time, idempotency_key] }
+      new_enqueue = ->(fire_time:, idempotency_key:) { [fire_time, idempotency_key, :new] }
+      registry.add(key: test_key, cron: test_cron, enqueue: old_enqueue)
+
+      entry = registry.upsert(key: test_key, cron: '0 10 * * *', enqueue: new_enqueue)
+
+      expect(entry.cron).to eq('0 10 * * *')
+      expect(entry.enqueue).to eq(new_enqueue)
+      expect(registry.size).to eq(1)
+    end
+
+    it 'raises when key is empty' do
+      expect { registry.upsert(key: '', cron: test_cron, enqueue: test_enqueue) }.to raise_error(ArgumentError, /key cannot be empty/)
+    end
+
+    it 'raises when cron is empty' do
+      expect { registry.upsert(key: test_key, cron: '', enqueue: test_enqueue) }.to raise_error(ArgumentError, /cron cannot be empty/)
+    end
+
+    it 'raises when enqueue is not callable' do
+      expect { registry.upsert(key: test_key, cron: test_cron, enqueue: 'not callable') }.to raise_error(ArgumentError, /enqueue must be callable/)
+    end
+  end
+
   describe '#remove' do
     before { registry.add(key: test_key, cron: test_cron, enqueue: test_enqueue) }
 

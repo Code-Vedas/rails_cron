@@ -103,4 +103,18 @@ RSpec.describe RailsCron::Generators::InstallGenerator do
       )
     end
   end
+
+  describe '#create_scheduler_config' do
+    it 'creates the default scheduler YAML file' do
+      generator = build_generator(backend: 'sqlite')
+      allow(generator).to receive(:template)
+
+      generator.create_scheduler_config
+
+      expect(generator).to have_received(:template).with(
+        'scheduler.yml.tt',
+        'config/scheduler.yml'
+      )
+    end
+  end
 end
