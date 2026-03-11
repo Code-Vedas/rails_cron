@@ -283,7 +283,22 @@ module RailsCron
           key: key
         }
         resolved_args = resolve_placeholders(args_template.deep_dup, context)
-        resolved_kwargs = symbolize_keys_deep(resolve_placeholders(kwargs_template.deep_dup, context))
+        raw_kwargs = resolve_placeholders(kwargs_template.deep_dup, context) || {}
+        raise SchedulerConfigError, "kwargs for scheduler job '#{key}' must be a mapping, got #{raw_kwargs.class}" unless raw_kwargs.is_a?(Hash)
+
+        keys = raw_kwargs.keys
+        index = 0
+        while index < keys.length
+          kwargs_key = keys[index]
+          unless kwargs_key.is_a?(String) || kwargs_key.is_a?(Symbol)
+            raise SchedulerConfigError,
+                  "Invalid keyword argument key #{kwargs_key.inspect} (#{kwargs_key.class}) for scheduler job '#{key}'"
+          end
+
+          index += 1
+        end
+
+        resolved_kwargs = raw_kwargs.transform_keys(&:to_sym)
 
         target = queue ? job_class.set(queue: queue) : job_class
         target.perform_later(*resolved_args, **resolved_kwargs)

@@ -505,6 +505,59 @@ RSpec.describe RailsCron::SchedulerFileLoader do
     expect(set_target).to have_received(:perform_later)
   end
 
+  it 'symbolizes only top-level kwargs keys and preserves nested keys' do
+    allow(SchedulerLoaderTestJob).to receive(:perform_later)
+    write_scheduler(<<~YAML)
+      test:
+        jobs:
+          - key: "job:nested_kwargs"
+            cron: "*/5 * * * *"
+            job_class: "SchedulerLoaderTestJob"
+            kwargs:
+              payload:
+                "nested_key": "nested_value"
+              "plain_key": "value"
+    YAML
+
+    build_loader.load
+    registry.find('job:nested_kwargs').enqueue.call(fire_time: Time.current, idempotency_key: 'id-1')
+
+    expect(SchedulerLoaderTestJob).to have_received(:perform_later).with(
+      payload: { 'nested_key' => 'nested_value' },
+      plain_key: 'value'
+    )
+  end
+
+  it 'raises when callback kwargs resolve to a non-hash at runtime' do
+    callback = build_loader.send(
+      :build_callback,
+      key: 'job:runtime_bad_kwargs_type',
+      job_class_name: 'SchedulerLoaderTestJob',
+      queue: nil,
+      args_template: [],
+      kwargs_template: []
+    )
+
+    expect do
+      callback.call(fire_time: Time.current, idempotency_key: 'id-1')
+    end.to raise_error(RailsCron::SchedulerConfigError, /kwargs for scheduler job 'job:runtime_bad_kwargs_type' must be a mapping/)
+  end
+
+  it 'raises when callback kwargs contain invalid top-level key type at runtime' do
+    callback = build_loader.send(
+      :build_callback,
+      key: 'job:runtime_bad_kwargs_key',
+      job_class_name: 'SchedulerLoaderTestJob',
+      queue: nil,
+      args_template: [],
+      kwargs_template: { Object.new => 'value' }
+    )
+
+    expect do
+      callback.call(fire_time: Time.current, idempotency_key: 'id-1')
+    end.to raise_error(RailsCron::SchedulerConfigError, /Invalid keyword argument key/)
+  end
+
   it 'applies conflict policy code_wins by skipping file entry' do
     configuration.scheduler_conflict_policy = :code_wins
     definition_registry.upsert_definition(key: 'job:conflict', cron: '* * * * *', enabled: true, source: 'code', metadata: {})
