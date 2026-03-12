@@ -7,20 +7,24 @@
 
 require 'rails_helper'
 
-RSpec.describe 'Lock integration', integration: 'mysql' do # rubocop:disable RSpec/DescribeClass
+RSpec.describe 'Adapter integration', integration: 'mysql' do # rubocop:disable RSpec/DescribeClass
   include IntegrationLockHelper
+  include IntegrationSchedulerHelper
 
   let(:adapter_label) { 'mysql' }
   let(:adapter_instance) { RailsCron::Backend::MySQLAdapter.new }
 
   before do
-    configure_backend(adapter_instance, adapter_label)
+    configure_scheduler_backend(adapter_instance, adapter_label)
   end
 
   after do
+    cleanup_scheduler_state(adapter_label)
     cleanup_lock_keys(adapter_label)
     restore_backend
   end
 
   it_behaves_like 'lock adapter integration'
+  it_behaves_like 'scheduler lifecycle integration'
+  it_behaves_like 'shared store scheduler lifecycle integration'
 end

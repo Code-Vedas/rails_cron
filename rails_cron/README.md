@@ -281,6 +281,26 @@ RSpec.describe "multi-node safety" do
 end
 ```
 
+### Local Test Commands
+
+Run the fast unit suite from the gem directory:
+
+```bash
+bin/rspec-unit
+```
+
+Run end-to-end adapter coverage with the same entrypoint used in CI:
+
+```bash
+bin/rspec-e2e memory
+bin/rspec-e2e sqlite
+DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/rails_cron_test bin/rspec-e2e pg
+DATABASE_URL=mysql2://root:rootROOT\!1@127.0.0.1:3306/rails_crons_test bin/rspec-e2e mysql
+REDIS_URL=redis://127.0.0.1:6379/0 bin/rspec-e2e redis
+```
+
+`pg` and `mysql` require `DATABASE_URL`. `redis` requires `REDIS_URL`. `memory` and `sqlite` use local test defaults.
+
 ---
 
 ## 🧩 Roadmap
