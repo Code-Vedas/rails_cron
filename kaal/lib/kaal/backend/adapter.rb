@@ -36,7 +36,7 @@ module Kaal
       #
       # @example
       #   adapter = MyBackendAdapter.new
-      #   acquired = adapter.acquire("railscron:job1:1234567890", 60)
+      #   acquired = adapter.acquire("kaal:job1:1234567890", 60)
       #   if acquired
       #     # Do work...
       #   end
@@ -53,7 +53,7 @@ module Kaal
       # @raise [NotImplementedError] if not implemented by subclass
       #
       # @example
-      #   adapter.release("railscron:job1:1234567890")
+      #   adapter.release("kaal:job1:1234567890")
       def release(_key)
         raise NotImplementedError, 'Subclasses must implement #release'
       end
@@ -71,7 +71,7 @@ module Kaal
       # @return [Object] the result of the block if executed, nil if lock not acquired
       #
       # @example
-      #   result = adapter.with_lock("railscron:job1:1234567890", ttl: 60) do
+      #   result = adapter.with_lock("kaal:job1:1234567890", ttl: 60) do
       #     # Do protected work
       #     42
       #   end

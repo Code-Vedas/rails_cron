@@ -20,8 +20,8 @@ Each cron job receives:
 The idempotency key is generated as: `{namespace}-{job_key}-{fire_time.to_i}`
 
 ```ruby
-# Example idempotency_key for namespace='railscron', key='reports:daily', fire_time=1609459200
-# => "railscron-reports:daily-1609459200"
+# Example idempotency_key for namespace='kaal', key='reports:daily', fire_time=1609459200
+# => "kaal-reports:daily-1609459200"
 ```
 
 This deterministic format ensures that:
@@ -96,7 +96,7 @@ Kaal.register(
     # In the enqueue callback, also use the pool with .with blocks
     # This ensures connections are properly managed for dispatch registry operations
     REDIS_POOL.with do |redis|
-      redis_key = "railscron:dedup:#{idempotency_key}"
+      redis_key = "kaal:dedup:#{idempotency_key}"
       # Use exists? for boolean check (redis-rb 4.2.0+)
       # exists? returns boolean, exists returns integer count
       unless redis.exists?(redis_key)
@@ -171,7 +171,7 @@ Combine cache checking with dispatch registry for production:
     cron: '0 2 * * *',
     enqueue: ->(fire_time:, idempotency_key:) {
       # Fast path: check in-memory cache first
-      cache_key = "railscron:#{idempotency_key}"
+      cache_key = "kaal:#{idempotency_key}"
       return if Rails.cache.exist?(cache_key)
 
       # Slow path: check database dispatch registry (auditable)

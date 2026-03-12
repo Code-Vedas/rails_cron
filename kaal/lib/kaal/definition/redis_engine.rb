@@ -8,7 +8,7 @@ module Kaal
   module Definition
     # Redis-backed definition registry shared across processes.
     class RedisEngine < Registry
-      def initialize(redis, namespace: 'railscron')
+      def initialize(redis, namespace: 'kaal')
         super()
         @redis = redis
         @namespace = namespace

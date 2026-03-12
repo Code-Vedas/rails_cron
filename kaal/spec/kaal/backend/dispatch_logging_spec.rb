@@ -47,7 +47,7 @@ RSpec.describe Kaal::Backend::DispatchLogging do
         Kaal.configuration.enable_log_dispatch_registry = true
 
         # Should not raise error despite missing dispatch_registry method
-        expect { adapter.log_dispatch_attempt('railscron:dispatch:job:1234567890') }.not_to raise_error
+        expect { adapter.log_dispatch_attempt('kaal:dispatch:job:1234567890') }.not_to raise_error
         expect(logger).not_to have_received(:error)
       end
     end
@@ -64,7 +64,7 @@ RSpec.describe Kaal::Backend::DispatchLogging do
         Kaal.configuration.enable_log_dispatch_registry = true
 
         # Should not raise, even though logger is nil
-        expect { adapter.log_dispatch_attempt('railscron:dispatch:job:1234567890') }.not_to raise_error
+        expect { adapter.log_dispatch_attempt('kaal:dispatch:job:1234567890') }.not_to raise_error
       end
     end
 
@@ -74,7 +74,7 @@ RSpec.describe Kaal::Backend::DispatchLogging do
         allow(adapter).to receive(:dispatch_registry).and_return(nil)
         Kaal.configuration.enable_log_dispatch_registry = true
 
-        expect { adapter.log_dispatch_attempt('railscron:dispatch:job:1234567890') }.not_to raise_error
+        expect { adapter.log_dispatch_attempt('kaal:dispatch:job:1234567890') }.not_to raise_error
       end
     end
 
@@ -87,7 +87,7 @@ RSpec.describe Kaal::Backend::DispatchLogging do
 
         Kaal.configuration.enable_log_dispatch_registry = true
 
-        adapter.log_dispatch_attempt('railscron:dispatch:daily_job:1609459200')
+        adapter.log_dispatch_attempt('kaal:dispatch:daily_job:1609459200')
 
         expect(registry).to have_received(:log_dispatch).with(
           'daily_job',
@@ -101,7 +101,7 @@ RSpec.describe Kaal::Backend::DispatchLogging do
 
   describe '.parse_lock_key' do
     it 'parses a standard lock key correctly' do
-      cron_key, fire_time = described_class.parse_lock_key('railscron:dispatch:daily_report:1609459200')
+      cron_key, fire_time = described_class.parse_lock_key('kaal:dispatch:daily_report:1609459200')
 
       expect(cron_key).to eq('daily_report')
       expect(fire_time).to eq(Time.at(1_609_459_200))
@@ -126,7 +126,7 @@ RSpec.describe Kaal::Backend::DispatchLogging do
     it 'delegates to the shared parser as an instance method' do
       adapter = test_class_with_registry.new
 
-      cron_key, fire_time = adapter.parse_lock_key('railscron:dispatch:daily_report:1609459200')
+      cron_key, fire_time = adapter.parse_lock_key('kaal:dispatch:daily_report:1609459200')
 
       expect(cron_key).to eq('daily_report')
       expect(fire_time).to eq(Time.at(1_609_459_200))

@@ -21,7 +21,9 @@ module Kaal
 
     ##
     # Entry class representing a single registered cron job
+    # rubocop:disable Style/RedundantStructKeywordInit
     Entry = Struct.new(:key, :cron, :enqueue, keyword_init: true)
+    # rubocop:enable Style/RedundantStructKeywordInit
 
     ##
     # Initialize a new Registry instance.

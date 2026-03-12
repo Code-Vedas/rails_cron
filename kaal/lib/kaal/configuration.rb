@@ -22,7 +22,7 @@ module Kaal
       window_lookback: 120,
       window_lookahead: 0,
       lease_ttl: 125, # Must be >= window_lookback + tick_interval (120 + 5 = 125)
-      namespace: 'railscron',
+      namespace: 'kaal',
       backend: nil,
       logger: nil,
       time_zone: nil,

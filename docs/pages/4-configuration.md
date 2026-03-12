@@ -34,7 +34,7 @@ Kaal.configure do |c|
   c.lease_ttl        = 125
 
   # Optional prefix for Redis/Postgres keys
-  c.namespace        = "railscron"
+  c.namespace        = "kaal"
 
   # Optional logger override
   # c.logger = Logger.new($stdout, level: :info)
@@ -59,7 +59,7 @@ end
 | `window_lookback`              | Integer | `120`                       | How far back the scheduler will replay missed ticks.                                                  |
 | `window_lookahead`             | Integer | `0`                         | How far ahead to pre-trigger upcoming ticks (optional).                                               |
 | `lease_ttl`                    | Integer | `125`                       | Duration for distributed coordination lease in seconds. Must be `>= window_lookback + tick_interval`. |
-| `namespace`                    | String  | `"railscron"`               | Key prefix used for coordination keys and dispatch records.                                           |
+| `namespace`                    | String  | `"kaal"`               | Key prefix used for coordination keys and dispatch records.                                           |
 | `logger`                       | Logger  | `Rails.logger` (if present) | Logger used for scheduler messages.                                                                   |
 | `enable_log_dispatch_registry` | Boolean | `false`                     | Enable dispatch logging for audit trail and recovery.                                                 |
 | `enable_dispatch_recovery`     | Boolean | `true`                      | Automatically recover missed runs after downtime.                                                     |

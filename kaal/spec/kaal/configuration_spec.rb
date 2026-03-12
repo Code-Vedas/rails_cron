@@ -19,7 +19,7 @@ RSpec.describe Kaal::Configuration do
       window_lookback: 120,
       window_lookahead: 0,
       lease_ttl: 125,
-      namespace: 'railscron',
+      namespace: 'kaal',
       backend: nil,
       logger: nil,
       time_zone: nil,
@@ -51,7 +51,7 @@ RSpec.describe Kaal::Configuration do
     end
 
     it 'defaults namespace' do
-      expect(config.namespace).to eq('railscron')
+      expect(config.namespace).to eq('kaal')
     end
 
     it 'defaults backend' do
@@ -259,7 +259,7 @@ RSpec.describe Kaal::Configuration do
     end
 
     it 'includes default namespace' do
-      expect(config.to_h[:namespace]).to eq('railscron')
+      expect(config.to_h[:namespace]).to eq('kaal')
     end
 
     it 'includes backend class name when set' do

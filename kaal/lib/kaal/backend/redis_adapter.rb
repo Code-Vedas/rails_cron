@@ -36,7 +36,7 @@ module Kaal
       # @param redis [Object] a Redis-compatible client instance
       # @param namespace [String] namespace prefix for dispatch registry keys
       # @raise [ArgumentError] if redis is not provided or does not implement the required interface
-      def initialize(redis, namespace: 'railscron')
+      def initialize(redis, namespace: 'kaal')
         super()
         raise ArgumentError, 'redis client must respond to :set and :eval' unless redis.respond_to?(:set) && redis.respond_to?(:eval)
 

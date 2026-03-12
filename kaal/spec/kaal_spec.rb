@@ -777,7 +777,7 @@ RSpec.describe Kaal do
         idempotency_key
       end
 
-      expect(result).to eq('railscron-reports:daily-1234567890')
+      expect(result).to eq('kaal-reports:daily-1234567890')
     end
 
     it 'generates an idempotency key with custom namespace' do
@@ -801,7 +801,7 @@ RSpec.describe Kaal do
         yielded_key = key
       end
 
-      expect(yielded_key).to match(/^railscron-test:job-\d+$/)
+      expect(yielded_key).to match(/^kaal-test:job-\d+$/)
     end
 
     it 'returns the result of the block' do
