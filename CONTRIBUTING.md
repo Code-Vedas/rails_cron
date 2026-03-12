@@ -22,9 +22,9 @@ This project comprises various modules/components, each housed in its dedicated 
 
 The table below provides an overview of all possible modules/components:
 
-| Module/Component | Description         | Related Language/Framework |
-| ---------------- | ------------------- | -------------------------- |
-| kaal       | Distributed cron scheduler | Ruby              |
+| Module/Component | Description                | Related Language/Framework |
+| ---------------- | -------------------------- | -------------------------- |
+| kaal             | Distributed cron scheduler | Ruby                       |
 
 ## Improve Documentation
 

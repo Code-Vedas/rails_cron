@@ -240,7 +240,7 @@ RSpec.describe Kaal::RakeTasks do
       expect do
         described_class.shutdown_scheduler(signal: 'TERM', signal_state: signal_state)
       end.to output(/Received TERM, stopping Kaal scheduler/).to_stdout
-                                                                  .and output(/shutdown failed: stop blew up/).to_stderr
+                                                             .and output(/shutdown failed: stop blew up/).to_stderr
     end
 
     it 'marks force exit and raises interrupt on second signal after timeout' do
@@ -254,7 +254,7 @@ RSpec.describe Kaal::RakeTasks do
       expect do
         described_class.shutdown_scheduler(signal: 'TERM', signal_state: signal_state)
       end.to output(/Received TERM, stopping Kaal scheduler/).to_stdout
-                                                                  .and output(%r{stop timed out; send TERM/INT again to force exit}).to_stderr
+                                                             .and output(%r{stop timed out; send TERM/INT again to force exit}).to_stderr
 
       expect do
         described_class.shutdown_scheduler(signal: 'INT', signal_state: signal_state)

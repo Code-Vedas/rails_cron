@@ -27,7 +27,7 @@ It guarantees that:
 
 ## 🧩 Why Kaal?
 
-| Problem                              | Kaal Solution                                    |
+| Problem                              | Kaal Solution                                         |
 | ------------------------------------ | ----------------------------------------------------- |
 | Multiple nodes running the same cron | Distributed locks → exactly-once execution            |
 | Cron syntax not human-friendly       | Built-in parser + `to_human` translations             |
@@ -308,7 +308,7 @@ REDIS_URL=redis://127.0.0.1:6379/0 bin/rspec-e2e redis
 | Registry & API   | Cron registration and validation | `feature` |
 | Coordinator Loop | Safe ticking and dispatch        | `feature` |
 | Lock Adapters    | Redis / Postgres                 | `build`   |
-| CLI Tool         | `kaal` executable          | `build`   |
+| CLI Tool         | `kaal` executable                | `build`   |
 | i18n Humanizer   | Multi-language support           | `lang`    |
 | Docs & Examples  | Developer onboarding             | `lang`    |
 

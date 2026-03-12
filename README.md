@@ -42,9 +42,9 @@ Comprehensive guides are published at:
 
 👉 **[https://kaal.codevedas.com](https://kaal.codevedas.com)**
 
-| Section                                                            | Description                           |
-| ------------------------------------------------------------------ | ------------------------------------- |
-| [Overview & Motivation](https://kaal.codevedas.com/overview) | Why Kaal exists                  |
+| Section                                                      | Description                           |
+| ------------------------------------------------------------ | ------------------------------------- |
+| [Overview & Motivation](https://kaal.codevedas.com/overview) | Why Kaal exists                       |
 | [Installation & Setup](https://kaal.codevedas.com/install)   | Gem setup and initializer             |
 | [Usage](https://kaal.codevedas.com/usage)                    | Registering jobs, CLI, and Rake tasks |
 | [FAQ / Troubleshooting](https://kaal.codevedas.com/faq)      | Common issues and fixes               |
