@@ -28,15 +28,15 @@
 
 ### 🧰 Maintenance
 
-- build(deps): bump action_text-trix from 2.1.16 to 2.1.17 in /rails_cron in the bundler group across 1 directory @[dependabot[bot]](https://github.com/apps/dependabot) (#57)
-- build(deps-dev): bump ruby-lsp-rspec from 0.1.28 to 0.1.29 in /rails_cron @[dependabot[bot]](https://github.com/apps/dependabot) (#55)
-- build(deps-dev): bump sqlite3 from 2.9.0 to 2.9.1 in /rails_cron @[dependabot[bot]](https://github.com/apps/dependabot) (#48)
-- build(deps-dev): bump ruby-lsp from 0.26.6 to 0.26.7 in /rails_cron @[dependabot[bot]](https://github.com/apps/dependabot) (#43)
+- build(deps): bump action_text-trix from 2.1.16 to 2.1.17 in the bundler group across 1 directory @[dependabot[bot]](https://github.com/apps/dependabot) (#57)
+- build(deps-dev): bump ruby-lsp-rspec from 0.1.28 to 0.1.29 @[dependabot[bot]](https://github.com/apps/dependabot) (#55)
+- build(deps-dev): bump sqlite3 from 2.9.0 to 2.9.1 @[dependabot[bot]](https://github.com/apps/dependabot) (#48)
+- build(deps-dev): bump ruby-lsp from 0.26.6 to 0.26.7 @[dependabot[bot]](https://github.com/apps/dependabot) (#43)
 - build(deps-dev): bump nokogiri from 1.19.0 to 1.19.1 in /docs in the bundler group across 1 directory @[dependabot[bot]](https://github.com/apps/dependabot) (#41)
-- build(deps): bump rack from 3.2.4 to 3.2.5 in /rails_cron in the bundler group across 1 directory @[dependabot[bot]](https://github.com/apps/dependabot) (#39)
-- build(deps-dev): bump rspec-rails from 8.0.2 to 8.0.3 in /rails_cron @[dependabot[bot]](https://github.com/apps/dependabot) (#40)
+- build(deps): bump rack from 3.2.4 to 3.2.5 in the bundler group across 1 directory @[dependabot[bot]](https://github.com/apps/dependabot) (#39)
+- build(deps-dev): bump rspec-rails from 8.0.2 to 8.0.3 @[dependabot[bot]](https://github.com/apps/dependabot) (#40)
 - chore: dependencies update and rails 8.1 testing @niteshpurohit (#29)
-- build(deps-dev): bump sqlite3 from 2.7.4 to 2.8.0 in /rails_cron @[dependabot[bot]](https://github.com/apps/dependabot) (#18)
+- build(deps-dev): bump sqlite3 from 2.7.4 to 2.8.0 @[dependabot[bot]](https://github.com/apps/dependabot) (#18)
 - chore: Enable CSRF protection in dummy app @niteshpurohit (#17)
 
 ### 🧪 Tests
