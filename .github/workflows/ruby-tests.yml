@@ -21,7 +21,7 @@ permissions:
   contents: read
 env:
   RUBY_VERSION: 3.4.3
-  APP_DIR: ${{ github.workspace }}/rails_cron
+  APP_DIR: ${{ github.workspace }}/kaal
   BUNDLE_GEMFILE: ${{ inputs.bundle_gemfile != '' && format('{0}/{1}', github.workspace, inputs.bundle_gemfile) || '' }}
 jobs:
   test_e2e:
@@ -33,7 +33,7 @@ jobs:
         image: mysql:8.0
         env:
           MYSQL_ROOT_PASSWORD: rootROOT!1
-          MYSQL_DATABASE: rails_crons_test
+          MYSQL_DATABASE: kaal_test
         ports:
           - 3306:3306
         options: >-
@@ -77,7 +77,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ${{ env.APP_DIR }}/spec/dummy/tmp/cache
-          key: bootsnap-${{ runner.os }}-${{ env.RUBY_VERSION }}-${{ hashFiles('**/Gemfile.lock', '**/*.gemfile.lock') }}-${{ inputs.bundle_gemfile || 'rails_cron/Gemfile' }}
+          key: bootsnap-${{ runner.os }}-${{ env.RUBY_VERSION }}-${{ hashFiles('**/Gemfile.lock', '**/*.gemfile.lock') }}-${{ inputs.bundle_gemfile || 'kaal/Gemfile' }}
       - name: Run e2e in-memory
         working-directory: ${{ env.APP_DIR }}
         env:
@@ -97,7 +97,7 @@ jobs:
         working-directory: ${{ env.APP_DIR }}
         env:
           RAILS_ENV: test
-          DATABASE_URL: postgres://postgres:postgres@localhost:5432/rails_cron_test
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/kaal_test
         run: |
           bin/rails db:drop || true
           bin/rails db:create
@@ -107,7 +107,7 @@ jobs:
         working-directory: ${{ env.APP_DIR }}
         env:
           RAILS_ENV: test
-          DATABASE_URL: mysql2://root:rootROOT!1@127.0.0.1:3306/rails_crons_test
+          DATABASE_URL: mysql2://root:rootROOT!1@127.0.0.1:3306/kaal_test
         run: |
           bin/rails db:drop || true
           bin/rails db:create
@@ -142,7 +142,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ${{ env.APP_DIR }}/spec/dummy/tmp/cache
-          key: bootsnap-${{ runner.os }}-${{ env.RUBY_VERSION }}-${{ hashFiles('**/Gemfile.lock', '**/*.gemfile.lock') }}-${{ inputs.bundle_gemfile || 'rails_cron/Gemfile' }}
+          key: bootsnap-${{ runner.os }}-${{ env.RUBY_VERSION }}-${{ hashFiles('**/Gemfile.lock', '**/*.gemfile.lock') }}-${{ inputs.bundle_gemfile || 'kaal/Gemfile' }}
       - name: Run unit tests
         working-directory: ${{ env.APP_DIR }}
         env:

@@ -6,7 +6,7 @@ permalink: /dispatch-log
 
 # 📋 Dispatch Log & Querying History
 
-When dispatch logging is enabled (`enable_log_dispatch_registry = true`), RailsCron maintains an audit trail of all cron job dispatch attempts. This allows you to query historical dispatch records, debug issues, and perform cleanup operations.
+When dispatch logging is enabled (`enable_log_dispatch_registry = true`), Kaal maintains an audit trail of all cron job dispatch attempts. This allows you to query historical dispatch records, debug issues, and perform cleanup operations.
 
 ---
 
@@ -15,13 +15,13 @@ When dispatch logging is enabled (`enable_log_dispatch_registry = true`), RailsC
 Configure dispatch logging in your Rails initializer:
 
 ```ruby
-# config/initializers/rails_cron.rb
-RailsCron.configure do |config|
+# config/initializers/kaal.rb
+Kaal.configure do |config|
   # Enable audit trail for all cron jobs
   config.enable_log_dispatch_registry = true
 
   # Choose your backend (determines storage and available methods)
-  config.backend = RailsCron::Backend::PostgresAdapter.new
+  config.backend = Kaal::Backend::PostgresAdapter.new
 end
 ```
 
@@ -29,10 +29,10 @@ end
 
 ## Accessing the Dispatch Log Registry
 
-Use `RailsCron.dispatch_log_registry` to access the underlying registry instance:
+Use `Kaal.dispatch_log_registry` to access the underlying registry instance:
 
 ```ruby
-registry = RailsCron.dispatch_log_registry
+registry = Kaal.dispatch_log_registry
 
 # Returns nil if no adapter is configured or adapter doesn't support dispatch logging
 if registry.nil?
@@ -53,7 +53,7 @@ These methods are available on all dispatch registry backends:
 Find a specific dispatch record:
 
 ```ruby
-registry = RailsCron.dispatch_log_registry
+registry = Kaal.dispatch_log_registry
 fire_time = Time.at(1609459200)
 
 record = registry.find_dispatch('reports:daily', fire_time)
@@ -63,10 +63,10 @@ record = registry.find_dispatch('reports:daily', fire_time)
 
 ### `dispatched?(key, fire_time)`
 
-Check if a dispatch exists (same as `RailsCron.dispatched?` but at registry level):
+Check if a dispatch exists (same as `Kaal.dispatched?` but at registry level):
 
 ```ruby
-registry = RailsCron.dispatch_log_registry
+registry = Kaal.dispatch_log_registry
 already_dispatched = registry.dispatched?('reports:daily', Time.current)
 # => true or false
 ```
@@ -75,14 +75,14 @@ already_dispatched = registry.dispatched?('reports:daily', Time.current)
 
 ## Database Backend API
 
-When using `RailsCron::Backend::PostgresAdapter`, `RailsCron::Backend::MySQLAdapter`, or `RailsCron::Backend::SQLiteAdapter` adapters, the dispatch registry provides advanced querying:
+When using `Kaal::Backend::PostgresAdapter`, `Kaal::Backend::MySQLAdapter`, or `Kaal::Backend::SQLiteAdapter` adapters, the dispatch registry provides advanced querying:
 
 ### `find_by_key(key)`
 
 Find all dispatch records for a specific cron job:
 
 ```ruby
-registry = RailsCron.dispatch_log_registry
+registry = Kaal.dispatch_log_registry
 
 # Get all historical dispatches, most recent first
 records = registry.find_by_key('reports:daily')
@@ -97,7 +97,7 @@ records.order(fire_time: :asc)
 Find all dispatches originating from a specific node:
 
 ```ruby
-registry = RailsCron.dispatch_log_registry
+registry = Kaal.dispatch_log_registry
 
 # Find all dispatches from a specific worker node
 records = registry.find_by_node('web-worker-1')
@@ -112,7 +112,7 @@ failed = registry.find_by_node('web-worker-1').where(status: 'failed')
 Find all dispatch records with a specific status:
 
 ```ruby
-registry = RailsCron.dispatch_log_registry
+registry = Kaal.dispatch_log_registry
 
 # Find successful dispatches
 dispatched = registry.find_by_status('dispatched')
@@ -126,7 +126,7 @@ failed = registry.find_by_status('failed')
 Delete old dispatch records to prevent unbounded database growth:
 
 ```ruby
-registry = RailsCron.dispatch_log_registry
+registry = Kaal.dispatch_log_registry
 
 # Delete dispatch records older than 7 days
 deleted_count = registry.cleanup(recovery_window: 7 * 24 * 60 * 60)
@@ -140,14 +140,14 @@ registry.cleanup  # Deletes records older than 86400 seconds
 
 ## Memory Backend API
 
-When using `RailsCron::Backend::MemoryAdapter` adapter, the registry provides in-memory inspection:
+When using `Kaal::Backend::MemoryAdapter` adapter, the registry provides in-memory inspection:
 
 ### `clear()`
 
 Clear all dispatch records (useful for testing):
 
 ```ruby
-registry = RailsCron.dispatch_log_registry
+registry = Kaal.dispatch_log_registry
 
 registry.clear  # Removes all dispatches
 ```
@@ -157,7 +157,7 @@ registry.clear  # Removes all dispatches
 Get the number of stored dispatch records:
 
 ```ruby
-registry = RailsCron.dispatch_log_registry
+registry = Kaal.dispatch_log_registry
 
 count = registry.size
 puts "#{count} dispatch records in memory"
@@ -167,13 +167,13 @@ puts "#{count} dispatch records in memory"
 
 ## Redis Backend
 
-When using `RailsCron::Backend::RedisAdapter` adapter, dispatch records are automatically expired based on TTL:
+When using `Kaal::Backend::RedisAdapter` adapter, dispatch records are automatically expired based on TTL:
 
 ```ruby
-# config/initializers/rails_cron.rb
+# config/initializers/kaal.rb
 redis = Redis.new(url: ENV['REDIS_URL'])
-RailsCron.configure do |config|
-  config.backend = RailsCron::Backend::RedisAdapter.new(redis, namespace: 'myapp')
+Kaal.configure do |config|
+  config.backend = Kaal::Backend::RedisAdapter.new(redis, namespace: 'myapp')
   config.enable_log_dispatch_registry = true
 end
 
@@ -188,7 +188,7 @@ end
 ### Example 1: Debug Why a Job Wasn't Enqueued
 
 ```ruby
-registry = RailsCron.dispatch_log_registry
+registry = Kaal.dispatch_log_registry
 fire_time = 1.hour.ago.beginning_of_hour
 
 # Check if it was already dispatched
@@ -204,7 +204,7 @@ end
 ### Example 2: Find Recently Failed Dispatches
 
 ```ruby
-registry = RailsCron.dispatch_log_registry
+registry = Kaal.dispatch_log_registry
 
 # Get failed dispatches from the last hour
 failed = registry.find_by_key('reports:daily')
@@ -219,7 +219,7 @@ end
 ### Example 3: Analyze Dispatch Pattern by Node
 
 ```ruby
-registry = RailsCron.dispatch_log_registry
+registry = Kaal.dispatch_log_registry
 
 # Find which nodes dispatch the most jobs
 nodes = ['web-1', 'web-2', 'worker-1']
@@ -236,11 +236,11 @@ end
 Create a recurring task to clean up old dispatch records:
 
 ```ruby
-# lib/tasks/rails_cron_cleanup.rake
-namespace :rails_cron do
+# lib/tasks/kaal_cleanup.rake
+namespace :kaal do
   desc 'Clean up old dispatch records'
   task cleanup_dispatch_log: :environment do
-    registry = RailsCron.dispatch_log_registry
+    registry = Kaal.dispatch_log_registry
 
     if registry.nil?
       puts 'Dispatch logging not configured, skipping cleanup'
@@ -258,11 +258,11 @@ end
 Then schedule it in your cron system:
 
 ```ruby
-RailsCron.register(
+Kaal.register(
   key: 'maintenance:cleanup-dispatch-log',
   cron: '0 1 * * *',  # Daily at 1 AM
   enqueue: ->(_fire_time:, **) {
-    Rake::Task['rails_cron:cleanup_dispatch_log'].invoke
+    Rake::Task['kaal:cleanup_dispatch_log'].invoke
   }
 )
 ```
@@ -271,23 +271,23 @@ RailsCron.register(
 
 ## Direct Model Access
 
-For advanced queries, you can also query the `RailsCron::CronDispatch` ActiveRecord model directly:
+For advanced queries, you can also query the `Kaal::CronDispatch` ActiveRecord model directly:
 
 ```ruby
 # Find all dispatches for a job, ordered by recency
-RailsCron::CronDispatch.where(key: 'reports:daily').order(fire_time: :desc)
+Kaal::CronDispatch.where(key: 'reports:daily').order(fire_time: :desc)
 
 # Count total dispatches
-RailsCron::CronDispatch.count
+Kaal::CronDispatch.count
 
 # Find dispatches from today
-RailsCron::CronDispatch.where('fire_time >= ?', Time.current.beginning_of_day)
+Kaal::CronDispatch.where('fire_time >= ?', Time.current.beginning_of_day)
 
 # Find the most recently dispatched job
-RailsCron::CronDispatch.order(dispatched_at: :desc).first
+Kaal::CronDispatch.order(dispatched_at: :desc).first
 ```
 
-**Note:** It's recommended to use `RailsCron.dispatch_log_registry` for consistency, as it properly abstracts the underlying storage backend.
+**Note:** It's recommended to use `Kaal.dispatch_log_registry` for consistency, as it properly abstracts the underlying storage backend.
 
 ---
 
@@ -296,22 +296,22 @@ RailsCron::CronDispatch.order(dispatched_at: :desc).first
 ### Registry returns `nil`
 
 ```ruby
-registry = RailsCron.dispatch_log_registry
+registry = Kaal.dispatch_log_registry
 # => nil
 
 # Check if dispatch logging is enabled
-RailsCron.configuration.enable_log_dispatch_registry
+Kaal.configuration.enable_log_dispatch_registry
 # => false
 
 # Check if backend adapter is configured
-RailsCron.configuration.backend
+Kaal.configuration.backend
 # => nil
 ```
 
 ### Get "method not found" error
 
 ```ruby
-registry = RailsCron.dispatch_log_registry
+registry = Kaal.dispatch_log_registry
 
 # This will fail on Memory backend (doesn't support bulk queries)
 registry.find_by_key('mykey')  # Error: Memory backend doesn't have this method
@@ -335,7 +335,7 @@ If your dispatch table is very large, consider:
 1. **Run cleanup regularly:**
 
    ```ruby
-   RailsCron.dispatch_log_registry.cleanup(recovery_window: 7 * 24 * 60 * 60)
+   Kaal.dispatch_log_registry.cleanup(recovery_window: 7 * 24 * 60 * 60)
    ```
 
 2. **Use indexed queries:**
@@ -345,14 +345,14 @@ If your dispatch table is very large, consider:
    registry.find_dispatch('mykey', Time.current)
 
    # Slower: full table scan
-   RailsCron::CronDispatch.where(status: 'failed')
+   Kaal::CronDispatch.where(status: 'failed')
    ```
 
 3. **Archive old records:**
 
    ```ruby
    # Export records older than 90 days to archive storage
-   old = RailsCron::CronDispatch.where('fire_time < ?', 90.days.ago)
+   old = Kaal::CronDispatch.where('fire_time < ?', 90.days.ago)
    # ... backup to S3, etc ...
    old.delete_all
    ```

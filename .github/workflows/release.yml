@@ -13,7 +13,7 @@ concurrency:
 
 env:
   RUBY_VERSION: 3.4.3
-  APP_DIR: ${{ github.workspace }}/rails_cron
+  APP_DIR: ${{ github.workspace }}/kaal
 
 jobs:
   setup:
@@ -91,7 +91,7 @@ jobs:
     uses: ./.github/workflows/ruby-tests.yml
     with:
       upload_coverage: ${{ matrix.gemfile == 'rails_8_0.gemfile' }}
-      bundle_gemfile: rails_cron/gemfiles/${{ matrix.gemfile }}
+      bundle_gemfile: kaal/gemfiles/${{ matrix.gemfile }}
     secrets:
       QLTY_COVERAGE_TOKEN: ${{ secrets.QLTY_COVERAGE_TOKEN }}
   push:
@@ -115,6 +115,6 @@ jobs:
         uses: rubygems/configure-rubygems-credentials@main
       - name: Release
         run: |
-          cd rails_cron
-          gem build rails_cron.gemspec
-          gem push rails_cron-*.gem
+          cd kaal
+          gem build kaal.gemspec
+          gem push kaal-*.gem

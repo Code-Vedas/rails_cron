@@ -10,7 +10,7 @@ concurrency:
   cancel-in-progress: true
 env:
   RUBY_VERSION: 3.4.3
-  APP_DIR: ${{ github.workspace }}/rails_cron
+  APP_DIR: ${{ github.workspace }}/kaal
 jobs:
   danger:
     permissions:

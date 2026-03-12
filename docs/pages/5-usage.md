@@ -12,10 +12,10 @@ This page explains how to register cron jobs, run the scheduler, and use the pro
 
 ## 🧩 Registering Cron Jobs
 
-Define your recurring tasks during application boot (e.g. in `config/initializers/rails_crons_jobs.rb`):
+Define your recurring tasks during application boot (e.g. in `config/initializers/kaal_jobs.rb`):
 
 ```ruby
-RailsCron.register(
+Kaal.register(
   key: "reports:weekly_summary",
   cron: "0 9 * * 1", # every Monday at 9 AM
   enqueue: ->(fire_time:, idempotency_key:) {
@@ -40,15 +40,15 @@ RailsCron.register(
 
 ## 🕒 Starting the Scheduler
 
-`RailsCron` does **not** auto-start by default. Start it explicitly via `RailsCron.start!` or `rails_cron:start`.
+`Kaal` does **not** auto-start by default. Start it explicitly via `Kaal.start!` or `kaal:start`.
 
 You can start the scheduler loop in one of two ways:
 
 ### Option 1 — Inline in Rails
 
 ```ruby
-# config/initializers/rails_cron.rb
-RailsCron.start!
+# config/initializers/kaal.rb
+Kaal.start!
 ```
 
 > Use this mainly for development/testing. In production, prefer a standalone scheduler process.
@@ -56,14 +56,14 @@ RailsCron.start!
 ### Option 2 — Standalone process (recommended for production)
 
 ```bash
-bundle exec rails rails_cron:start
+bundle exec rails kaal:start
 ```
 
 Example **Procfile** entry:
 
 ```procfile
 web:       bundle exec puma -C config/puma.rb
-scheduler: bundle exec rails rails_cron:start
+scheduler: bundle exec rails kaal:start
 ```
 
 Avoid running scheduler inside web server processes by default. Keep scheduler lifecycle independent from request-serving processes.
@@ -72,7 +72,7 @@ Avoid running scheduler inside web server processes by default. Keep scheduler l
 
 ```ini
 [Unit]
-Description=RailsCron scheduler
+Description=Kaal scheduler
 After=network.target
 
 [Service]
@@ -80,8 +80,8 @@ Type=simple
 User=deploy
 WorkingDirectory=/var/apps/myapp/current
 Environment=RAILS_ENV=production
-ExecStart=/usr/bin/bash -lc 'bundle exec rails rails_cron:start'
-ExecStartPre=/usr/bin/bash -lc 'bundle exec rails rails_cron:status'
+ExecStart=/usr/bin/bash -lc 'bundle exec rails kaal:start'
+ExecStartPre=/usr/bin/bash -lc 'bundle exec rails kaal:status'
 ExecReload=/bin/kill -TERM $MAINPID
 Restart=always
 RestartSec=5
@@ -96,25 +96,25 @@ WantedBy=multi-user.target
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: rails-cron-scheduler
+  name: kaal-scheduler
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: rails-cron-scheduler
+      app: kaal-scheduler
   template:
     metadata:
       labels:
-        app: rails-cron-scheduler
+        app: kaal-scheduler
     spec:
       containers:
         - name: scheduler
           image: your-app:latest
-          command: ["bash", "-lc", "bundle exec rails rails_cron:start"]
+          command: ["bash", "-lc", "bundle exec rails kaal:start"]
 ```
 
 For Kubernetes, the scheduler is the container's main process; if it exits, Kubernetes restarts it.  
-Do not use `rails_cron:status` as a scheduler liveness/readiness probe because it runs in a separate process and cannot inspect in-memory scheduler state.
+Do not use `kaal:status` as a scheduler liveness/readiness probe because it runs in a separate process and cannot inspect in-memory scheduler state.
 
 Prefer:
 
@@ -128,10 +128,10 @@ Prefer:
 ### Explain and Preview Cron Expressions
 
 ```bash
-rails-crons explain "*/15 * * * *"
+kaal explain "*/15 * * * *"
 # => Every 15 minutes
 
-rails-crons next "0 9 * * 1" --count 3
+kaal next "0 9 * * 1" --count 3
 # => 2025-11-03 09:00:00 UTC
 # => 2025-11-10 09:00:00 UTC
 # => 2025-11-17 09:00:00 UTC
@@ -140,56 +140,56 @@ rails-crons next "0 9 * * 1" --count 3
 ### Rails Tasks
 
 ```bash
-bin/rails rails_cron:start          # Start scheduler loop
-bin/rails rails_cron:tick           # Trigger a single scheduler tick
-bin/rails rails_cron:status         # Show active configuration & registry
-bin/rails rails_cron:explain["*/5 * * * *"] # Humanize a cron expression
+bin/rails kaal:start          # Start scheduler loop
+bin/rails kaal:tick           # Trigger a single scheduler tick
+bin/rails kaal:status         # Show active configuration & registry
+bin/rails kaal:explain["*/5 * * * *"] # Humanize a cron expression
 ```
 
 ---
 
 ## 🧠 Cron Utilities
 
-`RailsCron` provides convenience helpers for validating, simplifying, and linting cron expressions.
+`Kaal` provides convenience helpers for validating, simplifying, and linting cron expressions.
 
 ```ruby
-RailsCron.valid?("*/5 * * * *")
+Kaal.valid?("*/5 * * * *")
 # => true
 
-RailsCron.simplify("0 0 * * *")
+Kaal.simplify("0 0 * * *")
 # => "@daily"
 
-RailsCron.lint("*/61 * * * *")
+Kaal.lint("*/61 * * * *")
 # => ["minute step '61' is out of range. Allowed step: 1-60.", "Invalid cron expression '*/61 * * * *'. Examples: '*/5 * * * *', '@daily'."]
 
-RailsCron.to_human("0 9 * * 1")
+Kaal.to_human("0 9 * * 1")
 # => "At 09:00 every Monday"
 
-RailsCron.to_human("@daily")
+Kaal.to_human("@daily")
 # => "Daily"
 
-RailsCron.to_human("0 9 * * 1", locale: :fr)
+Kaal.to_human("0 9 * * 1", locale: :fr)
 # => Uses :fr locale when available
 ```
 
 Supported predefined macros include:
 `@yearly`, `@annually`, `@monthly`, `@weekly`, `@daily`, `@midnight`, `@hourly`.
 
-`RailsCron.simplify` raises `ArgumentError` for invalid expressions with helpful examples:
+`Kaal.simplify` raises `ArgumentError` for invalid expressions with helpful examples:
 
 ```ruby
-RailsCron.simplify("not-a-cron")
+Kaal.simplify("not-a-cron")
 # raises ArgumentError: Invalid cron expression 'not-a-cron'. Examples: '*/5 * * * *', '@daily'.
 ```
 
-`RailsCron.to_human` also raises `ArgumentError` for invalid expressions and unsupported macros.
+`Kaal.to_human` also raises `ArgumentError` for invalid expressions and unsupported macros.
 
 ---
 
 ## 🔍 Checking Status
 
 ```bash
-bin/rails rails_cron:status
+bin/rails kaal:status
 ```
 
 Displays the current configuration, backend adapter, and registered jobs.
@@ -197,7 +197,7 @@ Displays the current configuration, backend adapter, and registered jobs.
 Example output:
 
 ```bash
-RailsCron v1.0.0
+Kaal v1.0.0
 Backend adapter: Redis
 Tick interval: 5s
 Registered jobs:

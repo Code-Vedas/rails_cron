@@ -1,9 +1,9 @@
-title: Rails Cron Documentation
+title: Kaal Documentation
 description: >-
-  Documentation for Rails Cron - A robust solution for scheduling and managing cron jobs in Ruby on Rails applications.
+  Kaal is a distributed cron scheduler for Ruby that safely executes scheduled tasks across multiple nodes.
 baseurl: ""
-domain: rails_cron.codevedas.com
-repository: Code-Vedas/rails_cron
+domain: kaal.codevedas.com
+repository: Code-Vedas/kaal
 # Build settings
 theme: just-the-docs
 plugins:
@@ -24,7 +24,7 @@ aux_links:
     url: javascript:toggleTheme();
     new_tab: false
   - title: Repository
-    url: https://github.com/Code-Vedas/rails_cron
+    url: https://github.com/Code-Vedas/kaal
     new_tab: true
 aux_links_new_tab: true
 nav_enabled: true

@@ -6,7 +6,7 @@ permalink: /install
 
 # ⚙️ Installation & Setup
 
-This page explains how to install the `rails-crons` gem, generate any backend-specific database migrations, and set up the initializer for your Rails application.
+This page explains how to install the `kaal` gem, generate any backend-specific database migrations, and set up the initializer for your application.
 
 ---
 
@@ -16,7 +16,7 @@ Add to your Gemfile:
 
 ```ruby
 # Gemfile
-gem "rails-crons"
+gem "kaal"
 ```
 
 Then run:
@@ -26,7 +26,7 @@ Then run:
 bundle install
 
 # Generate the initializer and any backend-specific migrations
-bin/rails g rails_cron:install --backend=sqlite
+bin/rails g kaal:install --backend=sqlite
 ```
 
 Use the backend option that matches your deployment:
@@ -48,23 +48,23 @@ bin/rails db:migrate
 If you ran the generator, you will find the initializer at:
 
 ```bash
-config/initializers/rails_cron.rb
+config/initializers/kaal.rb
 ```
 
 Example:
 
 ```ruby
-# config/initializers/rails_cron.rb
-RailsCron.configure do |c|
+# config/initializers/kaal.rb
+Kaal.configure do |c|
   # Choose the backend that matches your deployment.
-  # See the RailsCron documentation for backend-specific setup and the full
+  # See the Kaal documentation for backend-specific setup and the full
   # configuration reference.
   #
   # Redis (recommended)
-  # c.backend = RailsCron::Backend::RedisAdapter.new(Redis.new(url: ENV.fetch("REDIS_URL")))
+  # c.backend = Kaal::Backend::RedisAdapter.new(Redis.new(url: ENV.fetch("REDIS_URL")))
 
   # or Postgres advisory locks
-  # c.backend = RailsCron::Backend::PostgresAdapter.new
+  # c.backend = Kaal::Backend::PostgresAdapter.new
 
   # Frequency of scheduler ticks (seconds)
   c.tick_interval    = 5
@@ -94,7 +94,7 @@ end
 You can confirm everything is wired up by running:
 
 ```bash
-bin/rails rails_cron:status
+bin/rails kaal:status
 ```
 
 If successful, you’ll see your configuration and the registered cron jobs listed.

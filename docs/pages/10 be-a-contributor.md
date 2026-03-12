@@ -18,7 +18,7 @@ Generally, most of your contributions can be made using standard GitHub workflow
 
    ```bash
       git clone <your-forked-repo-url>
-      cd rails_cron
+      cd kaal
       git checkout -b <your-feature-branch> # or any other branch name
    ```
 
@@ -48,7 +48,7 @@ Generally, most of your contributions can be made using standard GitHub workflow
 8. **Address Feedback:** Be responsive to any feedback or requests for changes from the maintainers.
 9. **Celebrate Your Contribution:** Once your pull request is merged, celebrate your contribution to the project!
 
-You must follow the [Code of Conduct](https://github.com/Code-Vedas/rails_cron/blob/main/CODE_OF_CONDUCT.md) and adhere to the [Contribution Guidelines](https://github.com/Code-Vedas/rails_cron/blob/main/CONTRIBUTING.md)
+You must follow the [Code of Conduct](https://github.com/Code-Vedas/kaal/blob/main/CODE_OF_CONDUCT.md) and adhere to the [Contribution Guidelines](https://github.com/Code-Vedas/kaal/blob/main/CONTRIBUTING.md)
 
 ## Reporting Issues
 

@@ -1,0 +1,17 @@
+# frozen_string_literal: true
+
+# Creates the lock table for database-backed lease coordination.
+class CreateKaalLocks < ActiveRecord::Migration[7.0]
+  def change
+    create_table :kaal_locks do |t|
+      t.string :key, null: false, limit: 255
+      t.datetime :acquired_at, null: false
+      t.datetime :expires_at, null: false
+
+      t.timestamps
+    end
+
+    add_index :kaal_locks, :key, unique: true
+    add_index :kaal_locks, :expires_at
+  end
+end

@@ -1,6 +1,6 @@
-# Contribute to Code Vedas Template Repository
+# Contributing to Kaal
 
-Thank you for expressing your interest in contributing to Code Vedas Template Repository. Your contributions are highly valued, and we appreciate your commitment to enhancing this project. Before initiating any contribution, we kindly request you to carefully review this document.
+Thank you for contributing to Kaal. This repository contains the gem, documentation site, and supporting project assets. Review this guide before opening a change.
 
 Feel free to contribute through various avenues such as suggestions, comments, bug reports, or pull requests. To do so, please open an issue or a pull request directly in the repository.
 
@@ -8,7 +8,7 @@ Feel free to contribute through various avenues such as suggestions, comments, b
 
 There are several ways to become an active part of our community:
 
-1. [Create an issue](https://github.com/Code-Vedas/rails_cron/issues/new/choose) in the repository.
+1. [Create an issue](https://github.com/Code-Vedas/kaal/issues/new/choose) in the repository.
 2. Join our mailing list by sending an email to [Join mailing list](mailto:mailing-list@codevedas.com).
 3. Participate in our Slack channel by sending an email to [Join slack](mailto:join-slack@codevedas.com).
 4. Apply for project membership by sending an email to [Join project](mailto:join-project@codevedas.com). Following an initial screening, an invitation will be extended to you. This membership allows you to create issues, pull requests, and more, directly in the repository without the need to fork it.
@@ -22,9 +22,9 @@ This project comprises various modules/components, each housed in its dedicated 
 
 The table below provides an overview of all possible modules/components:
 
-| Module/Component | Description         | Related Language/Framework |
-| ---------------- | ------------------- | -------------------------- |
-| rails_cron       | Rails crons library | Ruby on Rails              |
+| Module/Component | Description                | Related Language/Framework |
+| ---------------- | -------------------------- | -------------------------- |
+| kaal             | Distributed cron scheduler | Ruby                       |
 
 ## Improve Documentation
 
@@ -107,10 +107,10 @@ When changes are made to the codebase, please ensure that the documentation is u
 
 ## Release Process
 
-To release a new version of the `rails_cron` gem, follow these steps.
+To release a new version of the `kaal` gem, follow these steps.
 
 Pick the version number from draft release notes on the
-[releases page](https://github.com/Code-Vedas/rails_cron/releases).
+[releases page](https://github.com/Code-Vedas/kaal/releases).
 
 1. **Create a release branch**  
    Branch off `main` to a new branch named `release/<version>`.
@@ -122,16 +122,16 @@ Pick the version number from draft release notes on the
    ```
 
 2. **Update the version**
-   Update the version in `rails_cron.gemspec` to `<version>`.
+   Update the version in `kaal.gemspec` to `<version>`.
 
 3. **Update CHANGELOG**
    Copy the draft release notes from the
-   [releases page](https://github.com/Code-Vedas/rails_cron/releases)
+   [releases page](https://github.com/Code-Vedas/kaal/releases)
    and paste them into `CHANGELOG.md` under a new `## <version> - YYYY-MM-DD` section.
 
 4. **Docs sweep**
    Update all relevant docs to reflect this version (version number, features, fixes, usage):
-   - Root `README.md` and `rails_cron/README.md`
+   - Root `README.md` and `kaal/README.md`
    - `CONTRIBUTING.md` (if contributor process changed)
 
 5. **Verify release notes**
@@ -163,7 +163,7 @@ Pick the version number from draft release notes on the
 
 10. **Create a GitHub Release**
     After the PR is approved and merged, create a new Release on the
-    [GitHub releases page](https://github.com/Code-Vedas/rails_cron/releases).
+    [GitHub releases page](https://github.com/Code-Vedas/kaal/releases).
     Use **tag name** `v<version>` and include the release notes (same as `CHANGELOG.md`).
 
 11. **Publish via GitHub Actions**
@@ -174,7 +174,7 @@ Pick the version number from draft release notes on the
     Optionally verify the published version:
 
     ```bash
-    gem install rails_cron -v <version>
+    gem install kaal -v <version>
     ```
 
     and sanity-check a basic rake task in a fresh Rails app.

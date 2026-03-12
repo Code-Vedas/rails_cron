@@ -1,7 +1,7 @@
 version: 2
 updates:
   - package-ecosystem: bundler
-    directory: /rails_cron
+    directory: /kaal
     schedule:
       interval: daily
   - package-ecosystem: bundler

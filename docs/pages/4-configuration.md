@@ -6,7 +6,7 @@ permalink: /configuration
 
 # ⚙️ Configuration
 
-RailsCron can be configured globally through an initializer.  
+Kaal can be configured globally through an initializer.  
 All configuration options are optional and can be customized per environment.
 
 ---
@@ -14,12 +14,12 @@ All configuration options are optional and can be customized per environment.
 ## 🧩 Example Configuration
 
 ```ruby
-# config/initializers/rails_cron.rb
-RailsCron.configure do |c|
+# config/initializers/kaal.rb
+Kaal.configure do |c|
   # Choose your distributed backend adapter
-  # c.backend = RailsCron::Backend::RedisAdapter.new(Redis.new(url: ENV["REDIS_URL"]))
-  # c.backend = RailsCron::Backend::PostgresAdapter.new
-  # c.backend = RailsCron::Backend::MemoryAdapter.new # single-node only (not for production)
+  # c.backend = Kaal::Backend::RedisAdapter.new(Redis.new(url: ENV["REDIS_URL"]))
+  # c.backend = Kaal::Backend::PostgresAdapter.new
+  # c.backend = Kaal::Backend::MemoryAdapter.new # single-node only (not for production)
 
   # Frequency of scheduler ticks (in seconds)
   c.tick_interval    = 5
@@ -73,8 +73,8 @@ end
 ### Redis Adapter
 
 ```ruby
-RailsCron.configure do |c|
-  c.backend = RailsCron::Backend::RedisAdapter.new(
+Kaal.configure do |c|
+  c.backend = Kaal::Backend::RedisAdapter.new(
     Redis.new(url: ENV.fetch("REDIS_URL", "redis://127.0.0.1:6379/0"))
   )
 end
@@ -88,8 +88,8 @@ end
 ### Postgres Adapter
 
 ```ruby
-RailsCron.configure do |c|
-  c.backend = RailsCron::Backend::PostgresAdapter.new
+Kaal.configure do |c|
+  c.backend = Kaal::Backend::PostgresAdapter.new
 end
 ```
 
@@ -101,8 +101,8 @@ end
 ### Memory Adapter
 
 ```ruby
-RailsCron.configure do |c|
-  c.backend = RailsCron::Backend::MemoryAdapter.new
+Kaal.configure do |c|
+  c.backend = Kaal::Backend::MemoryAdapter.new
 end
 ```
 
@@ -113,10 +113,10 @@ end
 
 ## 🧱 Registering Jobs
 
-After configuration, register your cron tasks (usually in `config/initializers/rails_cron_jobs.rb`):
+After configuration, register your cron tasks (usually in `config/initializers/kaal_jobs.rb`):
 
 ```ruby
-RailsCron.register(
+Kaal.register(
   key: "cleanup:stale_sessions",
   cron: "*/15 * * * *", # every 15 minutes
   enqueue: ->(fire_time:, idempotency_key:) {
@@ -144,8 +144,8 @@ You can start the scheduler loop either inline or as a dedicated process.
 ### Option 1 — Inline (inside Rails)
 
 ```ruby
-# config/initializers/rails_cron.rb
-RailsCron.start!
+# config/initializers/kaal.rb
+Kaal.start!
 ```
 
 Starts automatically when Rails boots.
@@ -154,7 +154,7 @@ Prefer this for local/dev workflows.
 ### Option 2 — Standalone Process (Recommended)
 
 ```bash
-bundle exec rails rails_cron:start
+bundle exec rails kaal:start
 ```
 
 Use this as the default in production so scheduler restarts and deploy lifecycles are independent from web processes.
@@ -163,7 +163,7 @@ Use this as the default in production so scheduler restarts and deploy lifecycle
 
 ```procfile
 web:       bundle exec puma -C config/puma.rb
-scheduler: bundle exec rails rails_cron:start
+scheduler: bundle exec rails kaal:start
 ```
 
 > ✅ Best practice: run one scheduler per environment — multiple nodes can start it safely (only one acquires the lock per tick).
@@ -172,10 +172,10 @@ scheduler: bundle exec rails rails_cron:start
 
 ## 🧠 Logging
 
-RailsCron uses the Rails logger by default. You can customize it:
+Kaal uses the Rails logger by default. You can customize it:
 
 ```ruby
-RailsCron.configure do |c|
+Kaal.configure do |c|
   c.logger = Logger.new($stdout, level: :debug)
 end
 ```
@@ -188,7 +188,7 @@ end
 
 ### How It Works
 
-1. **On Startup**: Before the main scheduler loop begins, RailsCron looks back over a configurable window (default: 24 hours)
+1. **On Startup**: Before the main scheduler loop begins, Kaal looks back over a configurable window (default: 24 hours)
 2. **Computes Missed Runs**: For each registered cron job, it calculates which executions should have occurred
 3. **Checks Dispatch Records**: If dispatch logging is enabled, it skips runs that were already executed
 4. **Re-enqueues**: Missed runs are enqueued using the same coordination mechanism to prevent duplicates
@@ -196,7 +196,7 @@ end
 ### Configuration
 
 ```ruby
-RailsCron.configure do |c|
+Kaal.configure do |c|
   # Enable automatic recovery (default: true)
   c.enable_dispatch_recovery = true
 
@@ -225,10 +225,10 @@ end
 When both recovery and dispatch logging are enabled:
 
 ```ruby
-RailsCron.configure do |c|
+Kaal.configure do |c|
   c.enable_dispatch_recovery = true
   c.enable_log_dispatch_registry = true
-  c.backend = RailsCron::Backend::RedisAdapter.new(Redis.new(url: ENV["REDIS_URL"]))
+  c.backend = Kaal::Backend::RedisAdapter.new(Redis.new(url: ENV["REDIS_URL"]))
 end
 ```
 
@@ -268,7 +268,7 @@ end
 To disable automatic recovery (not recommended unless you have a custom solution):
 
 ```ruby
-RailsCron.configure do |c|
+Kaal.configure do |c|
   c.enable_dispatch_recovery = false
 end
 ```
@@ -292,11 +292,11 @@ Distributed lease coordination ensures **only one** node dispatches jobs for eac
 
 ```bash
 # Show configuration and registered jobs
-bin/rails rails_cron:status
+bin/rails kaal:status
 
 # Manually trigger one scheduler tick
-bin/rails rails_cron:tick
+bin/rails kaal:tick
 
 # Humanize a cron expression
-bin/rails rails_cron:explain["*/15 * * * *"]
+bin/rails kaal:explain["*/15 * * * *"]
 ```

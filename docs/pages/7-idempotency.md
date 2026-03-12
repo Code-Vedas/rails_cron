@@ -6,7 +6,7 @@ permalink: /idempotency-best-practices
 
 # 🔐 Idempotency & Job Deduplication
 
-Every time RailsCron fires a scheduled job, it provides a deterministic **idempotency_key** that uniquely identifies that job execution. This key is designed to help you implement deduplication logic in your job queue system, preventing duplicate job enqueues in distributed systems.
+Every time Kaal fires a scheduled job, it provides a deterministic **idempotency_key** that uniquely identifies that job execution. This key is designed to help you implement deduplication logic in your job queue system, preventing duplicate job enqueues in distributed systems.
 
 ---
 
@@ -43,8 +43,8 @@ However, if you manually create `fire_time` objects for manual idempotency check
 Enable dispatch logging and check before enqueueing:
 
 ```ruby
-# config/initializers/rails_cron.rb
-RailsCron.configure do |config|
+# config/initializers/kaal.rb
+Kaal.configure do |config|
   config.enable_log_dispatch_registry = true
 end
 ```
@@ -52,11 +52,11 @@ end
 Then use the simple helper in your enqueue callback:
 
 ```ruby
-RailsCron.register(
+Kaal.register(
   key: 'reports:daily',
   cron: '0 9 * * *',
   enqueue: ->(fire_time:, idempotency_key:) {
-    return if RailsCron.dispatched?('reports:daily', fire_time)
+    return if Kaal.dispatched?('reports:daily', fire_time)
 
     DailyReportJob.perform_later(fire_time: fire_time, idempotency_key: idempotency_key)
   }
@@ -68,7 +68,7 @@ RailsCron.register(
 - One-liner deduplication check
 - Built-in audit trail of all dispatches
 - Works with any job queue system
-- Audit trail queryable via `RailsCron::CronDispatch` model when enabled
+- Audit trail queryable via `Kaal::CronDispatch` model when enabled
 
 ---
 
@@ -82,14 +82,14 @@ require 'connection_pool'
 
 REDIS_POOL = ConnectionPool.new(size: 5) { Redis.new(url: ENV['REDIS_URL']) }
 
-RailsCron.configure do |config|
+Kaal.configure do |config|
   # Pass the ConnectionPool directly to the adapter
   # The pool will check out connections as needed for each lock operation
-  config.backend = RailsCron::Backend::RedisAdapter.new(REDIS_POOL)
+  config.backend = Kaal::Backend::RedisAdapter.new(REDIS_POOL)
   # Note: enable_log_dispatch_registry can be false - deduplication happens in Redis
 end
 
-RailsCron.register(
+Kaal.register(
   key: 'sync:data',
   cron: '*/30 * * * *',
   enqueue: ->(fire_time:, idempotency_key:) {
@@ -134,16 +134,16 @@ This prevents holding a single connection for the entire application lifetime, a
 For development and testing, use the memory adapter:
 
 ```ruby
-  RailsCron.configure do |config|
-    config.backend = RailsCron::Backend::MemoryAdapter.new
+  Kaal.configure do |config|
+    config.backend = Kaal::Backend::MemoryAdapter.new
     config.enable_log_dispatch_registry = true  # Optional: audit trail in-memory
   end
 
-  RailsCron.register(
+  Kaal.register(
     key: 'test:job',
     cron: '0 * * * *',
     enqueue: ->(fire_time:, idempotency_key:) {
-      return if RailsCron.dispatched?('test:job', fire_time)
+      return if Kaal.dispatched?('test:job', fire_time)
       TestJob.perform_later(fire_time: fire_time, idempotency_key: idempotency_key)
     }
   )
@@ -161,12 +161,12 @@ For development and testing, use the memory adapter:
 Combine cache checking with dispatch registry for production:
 
 ```ruby
-  RailsCron.configure do |config|
-    config.backend = RailsCron::Backend::PostgresAdapter.new
+  Kaal.configure do |config|
+    config.backend = Kaal::Backend::PostgresAdapter.new
     config.enable_log_dispatch_registry = true  # Enable audit trail
   end
 
-  RailsCron.register(
+  Kaal.register(
     key: 'cleanup:stale',
     cron: '0 2 * * *',
     enqueue: ->(fire_time:, idempotency_key:) {
@@ -175,7 +175,7 @@ Combine cache checking with dispatch registry for production:
       return if Rails.cache.exist?(cache_key)
 
       # Slow path: check database dispatch registry (auditable)
-      return if RailsCron.dispatched?('cleanup:stale', fire_time)
+      return if Kaal.dispatched?('cleanup:stale', fire_time)
 
       # Safe to enqueue
       CleanupJob.perform_later(fire_time: fire_time, idempotency_key: idempotency_key)
@@ -198,7 +198,7 @@ For utilities or advanced use cases, use the `with_idempotency` helper:
 
 ```ruby
   # Generate an idempotency_key outside of normal job dispatch
-  RailsCron.with_idempotency('reports:daily', Time.current) do |idempotency_key|
+  Kaal.with_idempotency('reports:daily', Time.current) do |idempotency_key|
     # Use the key for deduplication in your custom logic
     MyCustomQueue.add(idempotency_key, job_data)
   end
@@ -208,19 +208,19 @@ For utilities or advanced use cases, use the `with_idempotency` helper:
 
 ## Checking Dispatch Status
 
-Use `RailsCron.dispatched?` to check if a job has been dispatched:
+Use `Kaal.dispatched?` to check if a job has been dispatched:
 
 ```ruby
   # Check if a job was already dispatched for a specific fire time
   fire_time = Time.current
-  already_dispatched = RailsCron.dispatched?('reports:daily', fire_time)
+  already_dispatched = Kaal.dispatched?('reports:daily', fire_time)
 
   # Use in your enqueue callback
-  RailsCron.register(
+  Kaal.register(
     key: 'reports:daily',
     cron: '0 9 * * *',
     enqueue: ->(fire_time:, idempotency_key:) {
-      if RailsCron.dispatched?('reports:daily', fire_time)
+      if Kaal.dispatched?('reports:daily', fire_time)
         Rails.logger.info("Job already dispatched for fire_time=#{fire_time}")
         return
       end
@@ -230,9 +230,9 @@ Use `RailsCron.dispatched?` to check if a job has been dispatched:
   )
 ```
 
-**Note:** If you enabled `enable_log_dispatch_registry`, the dispatches are recorded in the `rails_cron_dispatches` table and can be queried directly via the CronDispatch model for audit trail purposes. However, the recommended way to check deduplication status is always through `RailsCron.dispatched?` helper.
+**Note:** If you enabled `enable_log_dispatch_registry`, the dispatches are recorded in the `kaal_dispatches` table and can be queried directly via the CronDispatch model for audit trail purposes. However, the recommended way to check deduplication status is always through `Kaal.dispatched?` helper.
 
-**Important:** When manually checking dispatch status outside the enqueue callback, always use `Time.current` (not `Time.now`) to ensure the fire_time is created in your application's configured timezone, matching how RailsCron generates fire_time internally.
+**Important:** When manually checking dispatch status outside the enqueue callback, always use `Time.current` (not `Time.now`) to ensure the fire_time is created in your application's configured timezone, matching how Kaal generates fire_time internally.
 
 ---
 
@@ -263,14 +263,14 @@ Use `RailsCron.dispatched?` to check if a job has been dispatched:
 1. Verify dispatch logging is enabled:
 
    ```ruby
-   RailsCron.configuration.enable_log_dispatch_registry  # Should be true
+   Kaal.configuration.enable_log_dispatch_registry  # Should be true
    ```
 
 2. Check if jobs are actually being logged:
 
    ```ruby
    # Query the dispatch audit trail directly
-   RailsCron::CronDispatch.where(key: 'reports:daily')
+   Kaal::CronDispatch.where(key: 'reports:daily')
    ```
 
 3. Verify the deduplication check is working:
@@ -278,7 +278,7 @@ Use `RailsCron.dispatched?` to check if a job has been dispatched:
    ```ruby
    # Test manually
    fire_time = Time.current
-   RailsCron.dispatched?('reports:daily', fire_time)  # Should be false first time
+   Kaal.dispatched?('reports:daily', fire_time)  # Should be false first time
    ```
 
 #### Dispatch registry is not recording
@@ -286,13 +286,13 @@ Use `RailsCron.dispatched?` to check if a job has been dispatched:
 1. Verify dispatch logging is enabled:
 
    ```ruby
-   RailsCron.configuration.enable_log_dispatch_registry  # Should be true
+   Kaal.configuration.enable_log_dispatch_registry  # Should be true
    ```
 
 2. Verify your backend adapter supports dispatch logging:
-   - **DatabaseEngine** (MySQL, PostgreSQL, SQLite): Requires `rails_cron_dispatches` table
+   - **DatabaseEngine** (MySQL, PostgreSQL, SQLite): Requires `kaal_dispatches` table
      - Run migrations: `rails db:migrate` (migrations are installed in your host Rails app)
-     - Check table: `ActiveRecord::Base.connection.table_exists?('rails_cron_dispatches')`
+     - Check table: `ActiveRecord::Base.connection.table_exists?('kaal_dispatches')`
    - **RedisEngine**: Requires Redis to be running and accessible
    - **MemoryEngine**: Works out of the box (persists only during process lifetime)
 
@@ -301,8 +301,8 @@ Use `RailsCron.dispatched?` to check if a job has been dispatched:
 ##### Example: Database adapter
 
 ```ruby
-  RailsCron.configure do |config|
-    config.backend = RailsCron::Backend::PostgresAdapter.new
+  Kaal.configure do |config|
+    config.backend = Kaal::Backend::PostgresAdapter.new
     config.enable_log_dispatch_registry = true
   end
 ```
@@ -310,9 +310,9 @@ Use `RailsCron.dispatched?` to check if a job has been dispatched:
 ##### Example: Redis adapter
 
 ```ruby
-  RailsCron.configure do |config|
+  Kaal.configure do |config|
     redis = Redis.new(url: ENV['REDIS_URL'])
-    config.backend = RailsCron::Backend::RedisAdapter.new(redis)
+    config.backend = Kaal::Backend::RedisAdapter.new(redis)
     config.enable_log_dispatch_registry = true
   end
 ```
@@ -320,8 +320,8 @@ Use `RailsCron.dispatched?` to check if a job has been dispatched:
 ##### Example: Memory adapter (development/testing only)
 
 ```ruby
-  RailsCron.configure do |config|
-    config.backend = RailsCron::Backend::MemoryAdapter.new
+  Kaal.configure do |config|
+    config.backend = Kaal::Backend::MemoryAdapter.new
     config.enable_log_dispatch_registry = true
   end
 ```
@@ -331,7 +331,7 @@ Use `RailsCron.dispatched?` to check if a job has been dispatched:
 1. Verify dispatch logging is enabled and configured correctly:
 
    ```ruby
-     RailsCron.configuration.enable_log_dispatch_registry  # Should be true
+     Kaal.configuration.enable_log_dispatch_registry  # Should be true
    ```
 
 2. If using a database backend (MySQL, PostgreSQL, SQLite):
@@ -339,7 +339,7 @@ Use `RailsCron.dispatched?` to check if a job has been dispatched:
    - Verify the table exists:
 
    ```ruby
-     ActiveRecord::Base.connection.table_exists?('rails_cron_dispatches')  # Should be true
+     ActiveRecord::Base.connection.table_exists?('kaal_dispatches')  # Should be true
    ```
 
 3. If using Redis backend:
@@ -354,7 +354,7 @@ Use `RailsCron.dispatched?` to check if a job has been dispatched:
 
    ```ruby
    # In your enqueue callback, add debug logging
-   RailsCron.register(
+   Kaal.register(
      key: 'test:job',
      cron: '0 * * * *',
      enqueue: ->(fire_time:, idempotency_key:) {
@@ -366,19 +366,19 @@ Use `RailsCron.dispatched?` to check if a job has been dispatched:
 
 #### Timezone Mismatch Issues
 
-If you're manually checking dispatch status using `RailsCron.dispatched?`, ensure timezone consistency:
+If you're manually checking dispatch status using `Kaal.dispatched?`, ensure timezone consistency:
 
 ```ruby
 # ❌ WRONG - uses system timezone (Time.now)
 time_in_system_tz = Time.now
-RailsCron.dispatched?('job:key', time_in_system_tz)
+Kaal.dispatched?('job:key', time_in_system_tz)
 
 # ✅ CORRECT - uses app's configured timezone (Time.current)
 time_in_app_tz = Time.current
-RailsCron.dispatched?('job:key', time_in_app_tz)
+Kaal.dispatched?('job:key', time_in_app_tz)
 ```
 
-**Why:** RailsCron generates fire_times using `Time.current` (your app's configured timezone). When you manually check dispatch status, use the same `Time.current` to ensure the fire_time matches what RailsCron expects.
+**Why:** Kaal generates fire_times using `Time.current` (your app's configured timezone). When you manually check dispatch status, use the same `Time.current` to ensure the fire_time matches what Kaal expects.
 
 **Check your app's timezone:**
 

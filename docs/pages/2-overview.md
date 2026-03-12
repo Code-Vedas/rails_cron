@@ -6,17 +6,17 @@ permalink: /overview
 
 # ⏰ Overview & Motivation
 
-`rails-crons` exists to solve one persistent problem in Rails applications:
+`kaal` exists to solve one persistent problem in distributed Ruby applications:
 
 > **How can you run scheduled tasks safely across multiple nodes — without tying yourself to a specific job system or scheduler?**
 
 Traditional cron jobs or Sidekiq-Cron setups work fine until you scale horizontally.  
 Then, the same cron tick may run **N times** where N = number of processes or pods.  
-`rails-crons` eliminates this duplication while staying fully **Rails-native**.
+`kaal` eliminates this duplication while staying easy to embed in Rails applications.
 
 ---
 
-## 🚀 Why Rails Cron?
+## 🚀 Why Kaal?
 
 - **Scheduler-agnostic** — No dependency on Sidekiq, Resque, or Rufus; just Ruby and backend adapters.
 - **Multi-node safe** — Guarantees _exactly-once_ dispatch even across multiple app instances.
@@ -32,7 +32,7 @@ Then, the same cron tick may run **N times** where N = number of processes or po
 - **Deterministic dispatching** — Every cron tick generates an idempotent key.
 - **Observability** — Built-in CLI and Rake tasks for introspection and debugging.
 - **Resilient to downtime** — Configurable _lookback window_ to replay missed runs.
-- **Rails-native integration** — Uses ActiveJob, `Rails.logger`, and Railtie for auto-loading tasks.
+- **Rails integration** — Uses ActiveJob, `Rails.logger`, and Railtie for smooth application boot.
 - **Graceful shutdown** — Completes current tick before exiting on `TERM` or `INT`.
 - **Standalone-friendly** — Run as a background process via Procfile, systemd, or Kubernetes.
 - **Cron helpers** — Built-in helpers for safe cron authoring workflows.
@@ -53,7 +53,7 @@ Then, the same cron tick may run **N times** where N = number of processes or po
 
 ---
 
-## 💡 When to Use Rails Cron
+## 💡 When to Use Kaal
 
 - You deploy **multiple web or job nodes** and need **only one node** to enqueue scheduled work.
 - You want **one unified registry** for all scheduled tasks, in code — not in crontab files.
@@ -65,7 +65,7 @@ Then, the same cron tick may run **N times** where N = number of processes or po
 
 ## 📊 Takeaways
 
-- Stop writing `if leader?` logic around cron jobs — `rails-crons` handles that.
+- Stop writing `if leader?` logic around cron jobs — `kaal` handles that.
 - Run safely in **multi-node environments** (Heroku, Kubernetes, ECS, etc.).
 - Use **Redis** for speed, **Postgres** for portability.
 - View, test, and run crons entirely from the **CLI or Rails console**.
