@@ -149,6 +149,20 @@ RSpec.describe RailsCron::SchedulerFileLoader do
     expect { build_loader.load }.to raise_error(RailsCron::SchedulerConfigError, /Placeholders are not supported in hash keys/)
   end
 
+  it 'raises when malformed placeholders are used in hash keys' do
+    write_scheduler(<<~YAML)
+      test:
+        jobs:
+          - key: "job:bad_key_placeholder"
+            cron: "*/5 * * * *"
+            job_class: "SchedulerLoaderTestJob"
+            kwargs:
+              "{{fire-time}}": "value"
+    YAML
+
+    expect { build_loader.load }.to raise_error(RailsCron::SchedulerConfigError, /Malformed placeholder/)
+  end
+
   it 'ignores non-string hash keys when validating placeholder keys' do
     expect do
       build_loader.send(:validate_placeholder_key, :symbol_key, key: 'job:symbol_key')

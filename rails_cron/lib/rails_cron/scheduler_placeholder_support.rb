@@ -53,6 +53,8 @@ module RailsCron
     def validate_placeholder_key(hash_key, key:)
       return unless hash_key.is_a?(String)
 
+      validate_placeholder_syntax(hash_key, key:)
+
       token = hash_key.scan(self.class::PLACEHOLDER_PATTERN).flatten.first
       return unless token
 

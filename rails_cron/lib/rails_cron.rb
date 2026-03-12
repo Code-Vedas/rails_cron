@@ -175,6 +175,11 @@ module RailsCron
       end
     end
 
+    ##
+    # Load scheduler definitions from the configured scheduler YAML file.
+    #
+    # @return [Array<Hash>] normalized jobs applied from scheduler file
+    # @raise [SchedulerConfigError] if scheduler file is invalid
     def load_scheduler_file!
       loader = SchedulerFileLoader.new(
         configuration: configuration,
@@ -185,6 +190,11 @@ module RailsCron
       loader.load
     end
 
+    ##
+    # Unregister (remove) a cron job by key.
+    #
+    # @param key [String] the unique identifier of the job to remove
+    # @return [Registry::Entry, nil] the removed entry, or nil if not found
     def unregister(key:)
       definition_registry.remove_definition(key)
       registry.remove(key)
