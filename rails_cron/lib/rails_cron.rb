@@ -27,6 +27,7 @@ require 'rails_cron/cron_utils'
 require 'rails_cron/cron_humanizer'
 require 'rails_cron/scheduler_config_error'
 require 'rails_cron/scheduler_file_loader'
+require 'rails_cron/register_conflict_support'
 require 'rails_cron/rake_tasks'
 require 'rails_cron/coordinator'
 require 'rails_cron/railtie'
@@ -49,6 +50,8 @@ require 'rails_cron/railtie'
 #   )
 module RailsCron
   class << self
+    include RegisterConflictSupport
+
     ##
     # Get the current configuration instance.
     #
@@ -147,8 +150,8 @@ module RailsCron
     #   )
     def register(key:, cron:, enqueue:)
       existing_definition = definition_registry.find_definition(key)
-      if registry.registered?(key)
-        existing_entry = registry.find(key)
+      existing_entry = registry.find(key)
+      if existing_entry
         conflict_result = resolve_register_conflict(
           key: key,
           cron: cron,
@@ -156,70 +159,22 @@ module RailsCron
           existing_definition: existing_definition,
           existing_entry: existing_entry
         )
+
         return conflict_result if conflict_result
 
         raise RegistryError, "Key '#{key}' is already registered"
       end
-
       persisted_attributes = {
         enabled: true,
         source: 'code',
         metadata: {}
       }.merge(existing_definition&.slice(:enabled, :source, :metadata) || {})
-
       definition_registry.upsert_definition(key: key, cron: cron, **persisted_attributes)
-      begin
+      with_registered_definition_rollback(key, existing_definition) do
         registry.add(key: key, cron: cron, enqueue: enqueue)
-      rescue StandardError
-        begin
-          rollback_registered_definition(key, existing_definition)
-        rescue StandardError => rollback_error
-          configuration.logger&.error("Failed to rollback persisted definition for #{key}: #{rollback_error.message}")
-        end
-
-        raise
       end
     end
 
-    def resolve_register_conflict(key:, cron:, enqueue:, existing_definition:, existing_entry:)
-      return unless existing_definition&.[](:source).to_s == 'file'
-
-      policy = configuration.scheduler_conflict_policy
-      case policy
-      when :error
-        raise RegistryError, "Key '#{key}' is already registered by scheduler file"
-      when :file_wins
-        configuration.logger&.warn("Skipping code registration for '#{key}' because scheduler_conflict_policy is :file_wins")
-        existing_entry
-      when :code_wins
-        replace_file_registered_definition(
-          key: key,
-          cron: cron,
-          enqueue: enqueue,
-          existing_definition: existing_definition
-        )
-      else
-        raise SchedulerConfigError, "Unsupported scheduler_conflict_policy '#{policy}'"
-      end
-    end
-    private :resolve_register_conflict
-
-    def replace_file_registered_definition(key:, cron:, enqueue:, existing_definition:)
-      persisted_attributes = {
-        enabled: existing_definition.fetch(:enabled, true),
-        source: 'code',
-        metadata: existing_definition.fetch(:metadata, {})
-      }
-      definition_registry.upsert_definition(key: key, cron: cron, **persisted_attributes)
-      registry.upsert(key: key, cron: cron, enqueue: enqueue)
-    end
-    private :replace_file_registered_definition
-
-    ##
-    # Load scheduler definitions from the configured scheduler YAML file.
-    #
-    # @return [Array<Hash>] normalized jobs applied from scheduler file
-    # @raise [SchedulerConfigError] if scheduler file is invalid
     def load_scheduler_file!
       loader = SchedulerFileLoader.new(
         configuration: configuration,
@@ -230,14 +185,6 @@ module RailsCron
       loader.load
     end
 
-    ##
-    # Unregister (remove) a cron job by key.
-    #
-    # @param key [String] the unique identifier of the job to remove
-    # @return [Registry::Entry, nil] the removed entry, or nil if not found
-    #
-    # @example
-    #   RailsCron.unregister(key: "reports:daily")
     def unregister(key:)
       definition_registry.remove_definition(key)
       registry.remove(key)

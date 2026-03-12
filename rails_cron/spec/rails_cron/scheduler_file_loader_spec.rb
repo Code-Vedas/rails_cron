@@ -121,6 +121,20 @@ RSpec.describe RailsCron::SchedulerFileLoader do
     expect { build_loader.load }.to raise_error(RailsCron::SchedulerConfigError, /Unknown placeholder/)
   end
 
+  it 'raises on malformed placeholders' do
+    write_scheduler(<<~YAML)
+      test:
+        jobs:
+          - key: "job:bad_placeholder_syntax"
+            cron: "*/5 * * * *"
+            job_class: "SchedulerLoaderTestJob"
+            args:
+              - "{{fire-time}}"
+    YAML
+
+    expect { build_loader.load }.to raise_error(RailsCron::SchedulerConfigError, /Malformed placeholder/)
+  end
+
   it 'raises when placeholders are used in hash keys' do
     write_scheduler(<<~YAML)
       test:

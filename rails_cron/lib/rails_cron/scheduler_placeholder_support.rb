@@ -8,6 +8,7 @@ module RailsCron
     def validate_placeholders(input, key:)
       case input
       when String
+        validate_placeholder_syntax(input, key:)
         input.scan(self.class::PLACEHOLDER_PATTERN).flatten.each do |token|
           next if @placeholder_resolvers.key?(token)
 
@@ -56,6 +57,22 @@ module RailsCron
       return unless token
 
       raise SchedulerConfigError, "Placeholders are not supported in hash keys (got '{{#{token}}}' under '#{key}')"
+    end
+
+    def validate_placeholder_syntax(input, key:)
+      raw_placeholders = input.scan(/\{\{.*?\}\}/)
+      raw_placeholders.each do |raw_placeholder|
+        next if raw_placeholder.match?(placeholder_token_anchors)
+
+        raise SchedulerConfigError, "Malformed placeholder '#{raw_placeholder}' for key '#{key}'"
+      end
+    end
+
+    def placeholder_token_anchors
+      @placeholder_token_anchors ||= begin
+        pattern = self.class::PLACEHOLDER_PATTERN
+        Regexp.new("\\A#{pattern.source}\\z", pattern.options)
+      end
     end
   end
 end

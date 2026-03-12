@@ -239,6 +239,32 @@ RSpec.describe RailsCron do
       expect(described_class.registry.find('job:file_defined')&.enqueue).to eq(code_callback)
     end
 
+    it 'rolls back persisted definition when :code_wins registry upsert fails' do
+      file_callback = ->(fire_time:, idempotency_key:) { [fire_time, idempotency_key, :file] }
+      code_callback = ->(fire_time:, idempotency_key:) { [fire_time, idempotency_key, :code] }
+      described_class.configuration.scheduler_conflict_policy = :code_wins
+      described_class.definition_registry.upsert_definition(
+        key: 'job:file_defined',
+        cron: '*/5 * * * *',
+        enabled: false,
+        source: 'file',
+        metadata: { 'owner' => 'ops' }
+      )
+      described_class.registry.add(key: 'job:file_defined', cron: '*/5 * * * *', enqueue: file_callback)
+      allow(described_class.registry).to receive(:upsert).and_raise(StandardError, 'registry upsert failure')
+
+      expect do
+        described_class.register(key: 'job:file_defined', cron: '0 9 * * *', enqueue: code_callback)
+      end.to raise_error(StandardError, 'registry upsert failure')
+
+      expect(described_class.definition_registry.find_definition('job:file_defined')).to include(
+        source: 'file',
+        cron: '*/5 * * * *',
+        enabled: false,
+        metadata: { 'owner' => 'ops' }
+      )
+    end
+
     it 'applies :file_wins by skipping code registration when key is sourced from scheduler file' do
       file_callback = ->(fire_time:, idempotency_key:) { [fire_time, idempotency_key, :file] }
       code_callback = ->(fire_time:, idempotency_key:) { [fire_time, idempotency_key, :code] }
@@ -372,7 +398,7 @@ RSpec.describe RailsCron do
       allow(definition_registry).to receive(:upsert_definition)
       allow(definition_registry).to receive(:remove_definition)
       allow(described_class.registry).to receive(:add).and_raise(StandardError, 'registry failure')
-      allow(described_class.registry).to receive(:registered?).with('job:race').and_return(false, true)
+      allow(described_class.registry).to receive(:registered?).with('job:race').and_return(true)
 
       expect do
         described_class.register(
