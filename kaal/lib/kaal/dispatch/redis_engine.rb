@@ -30,7 +30,7 @@ module Kaal
       # @param redis [Redis] Redis client instance
       # @param namespace [String] namespace prefix for Redis keys
       # @param ttl [Integer] TTL in seconds for dispatch records
-      def initialize(redis, namespace: 'railscron', ttl: DEFAULT_TTL)
+      def initialize(redis, namespace: 'kaal', ttl: DEFAULT_TTL)
         super()
         @redis = redis
         @namespace = namespace

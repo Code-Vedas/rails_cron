@@ -52,7 +52,7 @@ RSpec.describe Kaal::RakeTasks do
         window_lookback: 120,
         window_lookahead: 0,
         lease_ttl: 125,
-        namespace: 'railscron',
+        namespace: 'kaal',
         registered: [entry]
       )
 

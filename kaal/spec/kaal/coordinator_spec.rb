@@ -17,7 +17,7 @@ RSpec.describe Kaal::Coordinator do
       config.tick_interval = 0.01
       config.window_lookback = 10
       config.window_lookahead = 0
-      config.namespace = 'railscron'
+      config.namespace = 'kaal'
       config.enable_dispatch_recovery = false # Disable recovery by default in tests for performance
     end
   end
@@ -646,7 +646,7 @@ RSpec.describe Kaal::Coordinator do
       coordinator.send(:dispatch_work, entry, fire_time)
 
       expect(call_args[0]).to eq(fire_time)
-      expect(call_args[1]).to start_with('railscron-job-')
+      expect(call_args[1]).to start_with('kaal-job-')
     end
 
     it 'logs success when logger is present' do
@@ -686,14 +686,14 @@ RSpec.describe Kaal::Coordinator do
   describe '#generate_idempotency_key' do
     it 'generates key with namespace, cron_key, and fire_time' do
       key = coordinator.send(:generate_idempotency_key, 'job', Time.at(1_234_567_890))
-      expect(key).to eq('railscron-job-1234567890')
+      expect(key).to eq('kaal-job-1234567890')
     end
   end
 
   describe '#generate_lock_key' do
     it 'generates lock key with namespace, cron_key, and fire_time' do
       key = coordinator.send(:generate_lock_key, 'job', Time.at(1_234_567_890))
-      expect(key).to eq('railscron:dispatch:job:1234567890')
+      expect(key).to eq('kaal:dispatch:job:1234567890')
     end
   end
 
@@ -842,7 +842,7 @@ RSpec.describe Kaal::Coordinator do
 
       coordinator.send(:dispatch_work, entry, fire_time)
 
-      expect(captured_keys[0]).to eq('railscron-test-job-1000000000')
+      expect(captured_keys[0]).to eq('kaal-test-job-1000000000')
     end
 
     it 'dispatch_work passes fire_time and idempotency_key to enqueue' do
@@ -857,7 +857,7 @@ RSpec.describe Kaal::Coordinator do
       coordinator.send(:dispatch_work, entry, fire_time)
 
       expect(captured_args[:fire_time]).to eq(fire_time)
-      expect(captured_args[:idempotency_key]).to start_with('railscron-job-')
+      expect(captured_args[:idempotency_key]).to start_with('kaal-job-')
     end
 
     it 'request_stop waits on condition variable' do
@@ -1269,7 +1269,7 @@ RSpec.describe Kaal::Coordinator do
       coordinator.send(:dispatch_if_due, entry, fire_time, fire_time)
 
       # Verify lock key format with correct timestamp
-      expect(adapter).to have_received(:acquire).with(/railscron:dispatch:test:1000/, 125)
+      expect(adapter).to have_received(:acquire).with(/kaal:dispatch:test:1000/, 125)
     end
 
     it 'dispatch_if_due with fire_time equals now dispatches and logs' do
@@ -1283,7 +1283,7 @@ RSpec.describe Kaal::Coordinator do
       coordinator.send(:dispatch_if_due, entry, fire_time, fire_time)
 
       # Verify lock key format with correct timestamp
-      expect(adapter).to have_received(:acquire).with(/railscron:dispatch:test:1000000/, 125)
+      expect(adapter).to have_received(:acquire).with(/kaal:dispatch:test:1000000/, 125)
     end
 
     it 'calculate_and_dispatch_due_times logs debug with real logger and cron' do

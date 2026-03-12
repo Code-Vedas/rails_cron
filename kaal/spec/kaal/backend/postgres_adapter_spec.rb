@@ -39,7 +39,7 @@ RSpec.describe Kaal::Backend::PostgresAdapter do
       result_set = [{ 'pg_try_advisory_lock' => true }]
       allow(mock_connection).to receive(:execute).and_return(result_set)
 
-      result = adapter.acquire('railscron:dispatch:job1:1234567890', 60)
+      result = adapter.acquire('kaal:dispatch:job1:1234567890', 60)
       expect(result).to be(true)
     end
 
@@ -47,7 +47,7 @@ RSpec.describe Kaal::Backend::PostgresAdapter do
       result_set = [{ 'pg_try_advisory_lock' => false }]
       allow(mock_connection).to receive(:execute).and_return(result_set)
 
-      result = adapter.acquire('railscron:dispatch:job1:1234567890', 60)
+      result = adapter.acquire('kaal:dispatch:job1:1234567890', 60)
       expect(result).to be(false)
     end
 
@@ -55,7 +55,7 @@ RSpec.describe Kaal::Backend::PostgresAdapter do
       result_set = [{ 'pg_try_advisory_lock' => 't' }]
       allow(mock_connection).to receive(:execute).and_return(result_set)
 
-      result = adapter.acquire('railscron:dispatch:job1:1234567890', 60)
+      result = adapter.acquire('kaal:dispatch:job1:1234567890', 60)
       expect(result).to be(true)
       expect(result).to be_a(TrueClass)
     end
@@ -64,7 +64,7 @@ RSpec.describe Kaal::Backend::PostgresAdapter do
       result_set = [{ 'pg_try_advisory_lock' => 'f' }]
       allow(mock_connection).to receive(:execute).and_return(result_set)
 
-      result = adapter.acquire('railscron:dispatch:job1:1234567890', 60)
+      result = adapter.acquire('kaal:dispatch:job1:1234567890', 60)
       expect(result).to be(false)
       expect(result).to be_a(FalseClass)
     end
@@ -112,7 +112,7 @@ RSpec.describe Kaal::Backend::PostgresAdapter do
         allow(mock_connection).to receive(:execute).and_return(result_set)
 
         # Should not raise even if logging occurs
-        expect { adapter.acquire('railscron:dispatch:myjob:1609459200', 60) }.not_to raise_error
+        expect { adapter.acquire('kaal:dispatch:myjob:1609459200', 60) }.not_to raise_error
       end
 
       it 'logs error if dispatch logging fails' do
@@ -127,7 +127,7 @@ RSpec.describe Kaal::Backend::PostgresAdapter do
         allow(Kaal.configuration).to receive(:logger).and_return(logger)
         allow(logger).to receive(:error)
 
-        expect { adapter.acquire('railscron:dispatch:job:1234567890', 60) }.not_to raise_error
+        expect { adapter.acquire('kaal:dispatch:job:1234567890', 60) }.not_to raise_error
         expect(logger).to have_received(:error).with(/Failed to log dispatch/)
       end
     end
@@ -262,8 +262,8 @@ RSpec.describe Kaal::Backend::PostgresAdapter do
       result_set = [{ 'pg_try_advisory_lock' => true }]
       allow(mock_connection).to receive(:execute).and_return(result_set)
 
-      # Example: "railscron:dispatch:myjob:1609459200"
-      adapter.acquire('railscron:dispatch:myjob:1609459200', 60)
+      # Example: "kaal:dispatch:myjob:1609459200"
+      adapter.acquire('kaal:dispatch:myjob:1609459200', 60)
 
       expect(mock_connection).to have_received(:execute)
     end
@@ -272,8 +272,8 @@ RSpec.describe Kaal::Backend::PostgresAdapter do
       result_set = [{ 'pg_try_advisory_lock' => true }]
       allow(mock_connection).to receive(:execute).and_return(result_set)
 
-      # Example: "railscron:dispatch:send-daily-email:1609459200"
-      adapter.acquire('railscron:dispatch:send-daily-email:1609459200', 60)
+      # Example: "kaal:dispatch:send-daily-email:1609459200"
+      adapter.acquire('kaal:dispatch:send-daily-email:1609459200', 60)
 
       expect(mock_connection).to have_received(:execute)
     end

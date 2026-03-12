@@ -4,7 +4,7 @@ require 'spec_helper'
 require 'fakeredis'
 
 RSpec.describe Kaal::Definition::RedisEngine do
-  subject(:engine) { described_class.new(redis, namespace: 'railscron') }
+  subject(:engine) { described_class.new(redis, namespace: 'kaal') }
 
   let(:redis) { FakeRedis::Redis.new }
 
@@ -50,7 +50,7 @@ RSpec.describe Kaal::Definition::RedisEngine do
 
   it 'returns all definitions and filters invalid JSON entries' do
     engine.upsert_definition(key: 'job:one', cron: '0 9 * * *')
-    redis.hset('railscron:definitions', 'bad:json', '{not-json')
+    redis.hset('kaal:definitions', 'bad:json', '{not-json')
 
     keys = engine.all_definitions.map { |definition| definition[:key] }
     expect(keys).to contain_exactly('job:one')
@@ -58,7 +58,7 @@ RSpec.describe Kaal::Definition::RedisEngine do
 
   it 'handles invalid timestamps by returning nil for parsed times' do
     redis.hset(
-      'railscron:definitions',
+      'kaal:definitions',
       'job:bad-time',
       {
         key: 'job:bad-time',
@@ -81,7 +81,7 @@ RSpec.describe Kaal::Definition::RedisEngine do
 
   it 'casts non-true enabled values to false' do
     redis.hset(
-      'railscron:definitions',
+      'kaal:definitions',
       'job:disabled',
       {
         key: 'job:disabled',

@@ -24,7 +24,7 @@ RSpec.describe Kaal::Dispatch::RedisEngine do
     it 'uses default namespace and ttl' do
       engine = described_class.new(redis_client)
 
-      expect(engine.instance_variable_get(:@namespace)).to eq('railscron')
+      expect(engine.instance_variable_get(:@namespace)).to eq('kaal')
       expect(engine.instance_variable_get(:@ttl)).to eq(described_class::DEFAULT_TTL)
     end
   end

@@ -7,12 +7,12 @@ permalink: /support
 
 # Professional Support
 
-For organizations relying on rails crons in production, we offer **professional support plans** to ensure your systems run smoothly.
+For organizations relying on Kaal in production, we offer **professional support plans** to ensure your systems run smoothly.
 
 ## Why Choose Professional Support?
 
-- **Guaranteed Uptime:** Ensure your rails crons are always available and performant.
-- **Expert Assistance:** Get help from our team of experts who understand the intricacies of rails crons.
+- **Guaranteed Uptime:** Ensure your Kaal are always available and performant.
+- **Expert Assistance:** Get help from our team of experts who understand the intricacies of Kaal.
 - **Priority Response:** Receive faster response times for critical issues.
 
 ## Contact Us

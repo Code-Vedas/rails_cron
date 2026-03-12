@@ -39,7 +39,7 @@ RSpec.describe Kaal::Backend::MySQLAdapter do
       result_set = [{ 'lock_result' => 1 }]
       allow(mock_connection).to receive(:execute).and_return(result_set)
 
-      result = adapter.acquire('railscron:dispatch:job1:1234567890', 60)
+      result = adapter.acquire('kaal:dispatch:job1:1234567890', 60)
       expect(result).to be(true)
       expect(result).to be_a(TrueClass)
     end
@@ -48,7 +48,7 @@ RSpec.describe Kaal::Backend::MySQLAdapter do
       result_set = [{ 'lock_result' => 0 }]
       allow(mock_connection).to receive(:execute).and_return(result_set)
 
-      result = adapter.acquire('railscron:dispatch:job1:1234567890', 60)
+      result = adapter.acquire('kaal:dispatch:job1:1234567890', 60)
       expect(result).to be(false)
       expect(result).to be_a(FalseClass)
     end
@@ -57,7 +57,7 @@ RSpec.describe Kaal::Backend::MySQLAdapter do
       result_set = [{ 'lock_result' => nil }]
       allow(mock_connection).to receive(:execute).and_return(result_set)
 
-      result = adapter.acquire('railscron:dispatch:job1:1234567890', 60)
+      result = adapter.acquire('kaal:dispatch:job1:1234567890', 60)
       expect(result).to be(false)
     end
 
@@ -112,9 +112,9 @@ RSpec.describe Kaal::Backend::MySQLAdapter do
         allow(adapter).to receive(:log_dispatch_attempt).and_call_original
         allow(adapter.dispatch_registry).to receive(:log_dispatch)
 
-        adapter.acquire('railscron:dispatch:myjob:1609459200', 60)
+        adapter.acquire('kaal:dispatch:myjob:1609459200', 60)
 
-        expect(adapter).to have_received(:log_dispatch_attempt).with('railscron:dispatch:myjob:1609459200')
+        expect(adapter).to have_received(:log_dispatch_attempt).with('kaal:dispatch:myjob:1609459200')
       end
 
       it 'does not log dispatch when lock is not acquired' do
@@ -122,7 +122,7 @@ RSpec.describe Kaal::Backend::MySQLAdapter do
         allow(mock_connection).to receive(:execute).and_return(result_set)
         allow(adapter).to receive(:log_dispatch_attempt)
 
-        adapter.acquire('railscron:dispatch:myjob:1609459200', 60)
+        adapter.acquire('kaal:dispatch:myjob:1609459200', 60)
 
         expect(adapter).not_to have_received(:log_dispatch_attempt)
       end
@@ -136,7 +136,7 @@ RSpec.describe Kaal::Backend::MySQLAdapter do
         allow(Kaal.configuration).to receive(:logger).and_return(logger)
         allow(logger).to receive(:error)
 
-        expect { adapter.acquire('railscron:dispatch:job:1234567890', 60) }.not_to raise_error
+        expect { adapter.acquire('kaal:dispatch:job:1234567890', 60) }.not_to raise_error
         expect(logger).to have_received(:error).with(/Failed to log dispatch/)
       end
     end
@@ -278,7 +278,7 @@ RSpec.describe Kaal::Backend::MySQLAdapter do
       allow(mock_connection).to receive(:execute).and_return(result_set)
 
       # Should not raise
-      expect { adapter.acquire('railscron:dispatch:simple-job:1609459200', 60) }.not_to raise_error
+      expect { adapter.acquire('kaal:dispatch:simple-job:1609459200', 60) }.not_to raise_error
     end
 
     it 'parses lock keys with colons in the job name' do
@@ -286,7 +286,7 @@ RSpec.describe Kaal::Backend::MySQLAdapter do
       allow(mock_connection).to receive(:execute).and_return(result_set)
 
       # Job name contains colons (e.g., "job:subname:action")
-      expect { adapter.acquire('railscron:dispatch:job:subname:action:1609459200', 60) }.not_to raise_error
+      expect { adapter.acquire('kaal:dispatch:job:subname:action:1609459200', 60) }.not_to raise_error
     end
   end
 

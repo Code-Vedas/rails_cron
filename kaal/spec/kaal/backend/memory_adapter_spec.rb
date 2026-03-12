@@ -67,7 +67,7 @@ RSpec.describe Kaal::Backend::MemoryAdapter do
       end
 
       it 'logs dispatch when lock is acquired' do
-        expect { adapter.acquire('railscron:dispatch:myjob:1609459200', 60) }.not_to raise_error
+        expect { adapter.acquire('kaal:dispatch:myjob:1609459200', 60) }.not_to raise_error
       end
 
       it 'logs error if dispatch logging fails' do
@@ -77,7 +77,7 @@ RSpec.describe Kaal::Backend::MemoryAdapter do
         allow(Kaal.configuration).to receive(:logger).and_return(logger)
         allow(logger).to receive(:error)
 
-        expect { adapter.acquire('railscron:dispatch:job:1234567890', 60) }.not_to raise_error
+        expect { adapter.acquire('kaal:dispatch:job:1234567890', 60) }.not_to raise_error
         expect(logger).to have_received(:error).with(/Failed to log dispatch/)
       end
     end

@@ -418,7 +418,7 @@ module Kaal
     end
 
     def generate_lock_key(cron_key, fire_time)
-      namespace = @configuration.namespace || 'railscron'
+      namespace = @configuration.namespace || 'kaal'
       "#{namespace}:dispatch:#{cron_key}:#{fire_time.to_i}"
     end
 
