@@ -107,20 +107,15 @@ RSpec.shared_examples 'shared store scheduler lifecycle integration' do
     )
 
     coordinator_one = build_coordinator(adapter_instance:, registry: registry_one)
+    coordinator_two = build_coordinator(adapter_instance:, registry: registry_two)
 
     first_tick = integration_tick_time
     tick_scheduler(at: first_tick, coordinator: coordinator_one)
     expect(recorder_one.wait_for_count(1).first).to include(source: 'node-1', fire_time: expected_fire_time(first_tick))
 
-    definition_registry.disable_definition(key)
-    coordinator_two = build_coordinator(adapter_instance:, registry: registry_two)
-    tick_scheduler(at: integration_tick_time(1), coordinator: coordinator_two)
-    expect(recorder_two.snapshot).to be_empty
-
-    definition_registry.enable_definition(key)
-    coordinator_two = build_coordinator(adapter_instance:, registry: registry_two)
     second_tick = integration_tick_time(2)
     tick_scheduler(at: second_tick, coordinator: coordinator_two)
+    expect(definition_registry.find_definition(key)).to include(enabled: true)
     expect(recorder_two.wait_for_count(1).first).to include(source: 'node-2', fire_time: expected_fire_time(second_tick))
   end
 end

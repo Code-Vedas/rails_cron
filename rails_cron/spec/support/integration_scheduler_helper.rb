@@ -64,7 +64,7 @@ module IntegrationSchedulerHelper
 
     RailsCron.configure do |config|
       config.backend = adapter_instance
-      config.tick_interval = 0.01
+      config.tick_interval = 1
       config.window_lookback = 30
       config.window_lookahead = 0
       config.lease_ttl = 31
@@ -186,14 +186,10 @@ module IntegrationSchedulerHelper
     }
   end
 
-  def shared_definition_store?
-    adapter_label != 'memory'
-  end
-
   def build_coordinator(adapter_instance:, registry:)
     configuration = RailsCron::Configuration.new
     configuration.backend = adapter_instance
-    configuration.tick_interval = 0.01
+    configuration.tick_interval = 1
     configuration.window_lookback = 30
     configuration.window_lookahead = 0
     configuration.lease_ttl = 31
