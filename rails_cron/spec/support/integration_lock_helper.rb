@@ -6,6 +6,7 @@
 # LICENSE file in the root directory of this source tree.
 
 require 'securerandom'
+require 'timeout'
 
 module IntegrationLockHelper
   def configure_backend(adapter_instance, adapter_label)
@@ -68,31 +69,47 @@ module IntegrationLockHelper
 
   def with_held_lock(key, ttl: 30, hold_for: 0.1)
     acquired_signal = Queue.new
+    thread = Thread.new { hold_lock_in_thread(key:, ttl:, hold_for:, acquired_signal:) }
 
-    # PostgreSQL and MySQL adapters require connection pool handling for separate connections
-    thread = if [RailsCron::Backend::PostgresAdapter, RailsCron::Backend::MySQLAdapter].any? { |klass| backend.is_a?(klass) }
-               Thread.new do
-                 ActiveRecord::Base.connection_pool.with_connection do
-                   adapter_class = backend.class
-                   adapter_class.new.with_lock(key, ttl: ttl) do
-                     acquired_signal << true
-                     sleep hold_for
-                   end
-                 end
-               end
-             else
-               Thread.new do
-                 backend.with_lock(key, ttl: ttl) do
-                   acquired_signal << true
-                   sleep hold_for
-                 end
-               end
-             end
+    signal = Timeout.timeout(1) { acquired_signal.pop }
+    raise signal if signal.is_a?(StandardError)
+    raise "Failed to acquire held lock for #{key}" unless signal == :acquired
 
-    acquired_signal.pop
     yield
+  rescue Timeout::Error
+    raise "Timed out waiting for held lock #{key} to be acquired"
   ensure
     thread&.join
+  end
+
+  private
+
+  def hold_lock_in_thread(key:, ttl:, hold_for:, acquired_signal:)
+    hold_lock = lambda do |lock_adapter|
+      signaled = false
+
+      lock_adapter.with_lock(key, ttl: ttl) do
+        signaled = true
+        acquired_signal << :acquired
+        sleep hold_for
+      end
+
+      acquired_signal << :not_acquired unless signaled
+    end
+
+    if advisory_lock_adapter?
+      ActiveRecord::Base.connection_pool.with_connection do
+        hold_lock.call(backend.class.new)
+      end
+    else
+      hold_lock.call(backend)
+    end
+  rescue StandardError => e
+    acquired_signal << e
+  end
+
+  def advisory_lock_adapter?
+    [RailsCron::Backend::PostgresAdapter, RailsCron::Backend::MySQLAdapter].any? { |klass| backend.is_a?(klass) }
   end
 
   def configure_database(adapter_label)

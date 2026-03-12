@@ -79,8 +79,8 @@ module IntegrationSchedulerHelper
 
     scheduler_definition_keys(adapter_label).each do |key|
       RailsCron.definition_registry.remove_definition(key)
-    rescue StandardError
-      nil
+    rescue StandardError => e
+      warn "[IntegrationSchedulerHelper] Failed to remove scheduler definition #{key.inspect}: #{e.class}: #{e.message}"
     end
     scheduler_definition_keys(adapter_label).clear
 
@@ -120,7 +120,7 @@ module IntegrationSchedulerHelper
 
   def scheduler_key(suffix)
     key = "#{integration_key_prefix(adapter_label)}:scheduler:#{suffix}"
-    scheduler_definition_keys(adapter_label) << key unless scheduler_definition_keys(adapter_label).include?(key)
+    scheduler_definition_keys(adapter_label) << key
     key
   end
 
@@ -206,7 +206,7 @@ module IntegrationSchedulerHelper
   private
 
   def scheduler_definition_keys(label)
-    @scheduler_definition_keys ||= Hash.new { |hash, key| hash[key] = [] }
+    @scheduler_definition_keys ||= Hash.new { |hash, key| hash[key] = Set.new }
     @scheduler_definition_keys[label]
   end
 end
