@@ -67,21 +67,29 @@ module IntegrationLockHelper
   end
 
   def with_held_lock(key, ttl: 30, hold_for: 0.1)
+    acquired_signal = Queue.new
+
     # PostgreSQL and MySQL adapters require connection pool handling for separate connections
     thread = if [RailsCron::Backend::PostgresAdapter, RailsCron::Backend::MySQLAdapter].any? { |klass| backend.is_a?(klass) }
                Thread.new do
                  ActiveRecord::Base.connection_pool.with_connection do
                    adapter_class = backend.class
-                   adapter_class.new.with_lock(key, ttl: ttl) { sleep hold_for }
+                   adapter_class.new.with_lock(key, ttl: ttl) do
+                     acquired_signal << true
+                     sleep hold_for
+                   end
                  end
                end
              else
                Thread.new do
-                 backend.with_lock(key, ttl: ttl) { sleep hold_for }
+                 backend.with_lock(key, ttl: ttl) do
+                   acquired_signal << true
+                   sleep hold_for
+                 end
                end
              end
 
-    sleep 0.02
+    acquired_signal.pop
     yield
   ensure
     thread&.join
@@ -104,6 +112,9 @@ module IntegrationLockHelper
     when 'sqlite'
       ActiveRecord::Base.establish_connection(:test)
       ActiveRecord::Migration.maintain_test_schema!
+    when 'redis'
+      redis_url = ENV.fetch('REDIS_URL', 'redis://127.0.0.1:6379/0')
+      ENV['REDIS_URL'] = redis_url
     else
       ActiveRecord::Base.establish_connection(:test)
     end

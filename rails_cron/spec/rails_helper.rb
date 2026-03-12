@@ -6,6 +6,7 @@
 # LICENSE file in the root directory of this source tree.
 
 require 'simplecov'
+require 'active_support/testing/time_helpers'
 
 unless ENV['NO_COVERAGE'] == '1'
   SimpleCov.start do
@@ -39,6 +40,7 @@ rescue ActiveRecord::PendingMigrationError => e
 end
 RSpec.configure do |config|
   config.include ActiveJob::TestHelper
+  config.include ActiveSupport::Testing::TimeHelpers
 
   config.use_transactional_fixtures = false
   config.fixture_paths = [Rails.root.join('spec/fixtures')]
@@ -47,6 +49,12 @@ RSpec.configure do |config|
   config.before do
     RailsCron::CronDispatch.delete_all
     RailsCron::CronDefinition.delete_all if defined?(RailsCron::CronDefinition)
+  end
+
+  config.after do
+    travel_back
+  rescue StandardError
+    nil
   end
 
   config.after do
