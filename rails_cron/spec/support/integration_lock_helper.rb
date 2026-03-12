@@ -130,8 +130,8 @@ module IntegrationLockHelper
       ActiveRecord::Base.establish_connection(:test)
       ActiveRecord::Migration.maintain_test_schema!
     when 'redis'
-      redis_url = ENV.fetch('REDIS_URL', 'redis://127.0.0.1:6379/0')
-      ENV['REDIS_URL'] = redis_url
+      redis_url = ENV.fetch('REDIS_URL', nil)
+      raise 'REDIS_URL must be set for redis integration tests' if redis_url.to_s.strip.empty?
     else
       ActiveRecord::Base.establish_connection(:test)
     end

@@ -107,7 +107,6 @@ RSpec.shared_examples 'shared store scheduler lifecycle integration' do
     )
 
     coordinator_one = build_coordinator(adapter_instance:, registry: registry_one)
-    build_coordinator(adapter_instance:, registry: registry_two)
 
     first_tick = integration_tick_time
     tick_scheduler(at: first_tick, coordinator: coordinator_one)

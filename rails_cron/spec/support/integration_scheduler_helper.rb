@@ -103,7 +103,7 @@ module IntegrationSchedulerHelper
   end
 
   def register_code_job(key:, recorder:, source: 'code', cron: '* * * * *')
-    scheduler_definition_keys(adapter_label) << key
+    remember_scheduler_definition_key(key)
     RailsCron.register(
       key: key,
       cron: cron,
@@ -120,7 +120,7 @@ module IntegrationSchedulerHelper
 
   def scheduler_key(suffix)
     key = "#{integration_key_prefix(adapter_label)}:scheduler:#{suffix}"
-    scheduler_definition_keys(adapter_label) << key
+    remember_scheduler_definition_key(key)
     key
   end
 
@@ -205,8 +205,13 @@ module IntegrationSchedulerHelper
 
   private
 
+  def remember_scheduler_definition_key(key)
+    keys = scheduler_definition_keys(adapter_label)
+    keys << key unless keys.include?(key)
+  end
+
   def scheduler_definition_keys(label)
-    @scheduler_definition_keys ||= Hash.new { |hash, key| hash[key] = Set.new }
+    @scheduler_definition_keys ||= Hash.new { |hash, key| hash[key] = [] }
     @scheduler_definition_keys[label]
   end
 end
