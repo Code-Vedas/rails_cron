@@ -6,7 +6,7 @@
 
 ### 🧰 Maintenance
 
-- refactor: streamline gem information and copyright information by @niteshpurohit in #66
+- refactor: streamline gem information and copyright information @niteshpurohi (#66)
 
 ## [0.2.0](https://github.com/code-vedas/kaal/tree/v0.2.0) (2026-03-12)
 
