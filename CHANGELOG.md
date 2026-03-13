@@ -4,7 +4,7 @@
 
 [Full Changelog](https://github.com/code-vedas/kaal/compare/v0.2.0...v0.2.1)
 
-🧰 Maintenance
+### 🧰 Maintenance
 
 - refactor: streamline gem information and copyright information by @niteshpurohit in #66
 
