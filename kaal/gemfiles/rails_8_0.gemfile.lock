@@ -1,7 +1,7 @@
 PATH
   remote: ..
   specs:
-    kaal (0.2.0)
+    kaal (0.2.1)
       fugit (~> 1.8)
       rails (>= 7.1, < 9.0)
       rails-i18n (>= 7.0)

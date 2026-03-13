@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## [0.2.1](https://github.com/code-vedas/kaal/tree/v0.2.1) (2026-03-12)
+
+[Full Changelog](https://github.com/code-vedas/kaal/compare/v0.2.0...v0.2.1)
+
+### 🧰 Maintenance
+
+- refactor: streamline gem information and copyright information @niteshpurohit (#66)
+
 ## [0.2.0](https://github.com/code-vedas/kaal/tree/v0.2.0) (2026-03-12)
 
 [Full Changelog](https://github.com/code-vedas/kaal/compare/v0.1.0...v0.2.0)
